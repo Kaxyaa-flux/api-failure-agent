@@ -15,7 +15,7 @@ def generate_explanation(anomaly):
                 "content-type": "application/json"
             }
             
-            prompt = f"Analyze this API anomaly and provide a JSON response:\\n{json.dumps(anomaly, indent=2)}\\n\\nFormat your response as a valid JSON object with the following keys: 'issue' (string), 'severity' (string: high/medium/low), 'confidence' (float 0-1), 'root_cause' (string), 'steps' (list of strings)."
+            prompt = f"Analyze this API anomaly and provide a JSON response:\n{json.dumps(anomaly, indent=2)}\n\nFormat your response as a valid JSON object with the following keys: 'issue' (string), 'severity' (string: high/medium/low), 'confidence' (float 0-1), 'root_cause' (string), 'steps' (list of strings)."
             
             data = {
                 "model": "claude-sonnet-4-20250514",
