@@ -75,14 +75,23 @@ const AlertPanel = () => {
                   <p>{alert.root_cause || alert.rootCause || 'AI is still analyzing the root cause...'}</p>
                 </div>
                 
-                {(alert.debugging_steps || alert.debuggingSteps) && (
+                {(alert.steps || alert.debugging_steps || alert.debuggingSteps) && (
                   <div className="alert-section">
                     <span className="section-label">Suggested Fix</span>
                     <ul className="steps-list">
-                      {(alert.debugging_steps || alert.debuggingSteps || []).map((step, i) => (
+                      {(alert.steps || alert.debugging_steps || alert.debuggingSteps || []).map((step, i) => (
                         <li key={i}><ChevronRight size={14} className="step-bullet" /> {step}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+                {alert.confidence !== undefined && (
+                  <div className="confidence-row">
+                    <span className="section-label">AI Confidence</span>
+                    <div className="confidence-bar-wrap">
+                      <div className="confidence-bar" style={{ width: `${Math.round(alert.confidence * 100)}%` }} />
+                    </div>
+                    <span className="confidence-pct">{Math.round(alert.confidence * 100)}%</span>
                   </div>
                 )}
               </div>
@@ -137,6 +146,11 @@ const AlertPanel = () => {
         .step-bullet { color: var(--accent-color); margin-top: 2px; flex-shrink: 0; }
         
         .all-clear-icon { font-size: 3rem; color: var(--success-color); margin-bottom: 1rem; opacity: 0.8; }
+        
+        .confidence-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+        .confidence-bar-wrap { flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 9999px; overflow: hidden; }
+        .confidence-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 9999px; transition: width 0.4s ease; }
+        .confidence-pct { font-size: 0.75rem; font-weight: 600; color: #a78bfa; min-width: 2.5rem; text-align: right; }
       `}</style>
     </div>
   );
