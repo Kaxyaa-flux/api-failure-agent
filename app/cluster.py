@@ -1,4 +1,6 @@
-def cluster_failures(logs):
+from typing import List, Dict
+
+def cluster_failures(logs: List[Dict]) -> List[Dict]:
     clusters = {}
     
     for log in logs:
