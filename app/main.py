@@ -2,16 +2,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from datetime import datetime
+from contextlib import asynccontextmanager
+import time
 
 import app.db as db
 import app.anomaly as anomaly
 import app.cluster as cluster
 import app.llm as llm
 
-app = FastAPI(title="API Failure Detection & Debugging Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    yield
 
-# In-memory alerts store
-ALERTS = []
+app = FastAPI(title="API Failure Detection & Debugging Backend", lifespan=lifespan)
+
+# Simple cache for clusters (TTL = 5 seconds) to avoid heavy DB queries on every poll
+_CLUSTER_CACHE = {"timestamp": 0, "data": []}
 
 # CORS setup
 app.add_middleware(
@@ -22,26 +30,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup_event():
-    db.init_db()
-
 class LogEntry(BaseModel):
     endpoint: str
     method: str
     status_code: int
     latency: float
-    timestamp: str
+    timestamp: datetime
 
 @app.post("/logs")
 def ingest_log(log: LogEntry):
     # Store log
+    timestamp_str = log.timestamp.isoformat()
     db.insert_log(
         endpoint=log.endpoint,
         method=log.method,
         status_code=log.status_code,
         latency=log.latency,
-        timestamp=log.timestamp
+        timestamp=timestamp_str
     )
     
     # Process for anomaly detection
@@ -49,18 +54,10 @@ def ingest_log(log: LogEntry):
     detected_anomaly = anomaly.detect_anomalies(endpoint_logs)
     
     if detected_anomaly:
-        # Check if we already alerted for this timestamp to prevent spam
-        if not any(a["anomaly"]["timestamp"] == detected_anomaly["timestamp"] and a["anomaly"]["endpoint"] == detected_anomaly["endpoint"] for a in ALERTS):
+        # Deduplication: Check if we alerted recently for this endpoint
+        if not db.has_recent_alert(detected_anomaly["endpoint"], timestamp_str, within_minutes=5):
             explanation = llm.generate_explanation(detected_anomaly)
-            
-            alert = {
-                "anomaly": detected_anomaly,
-                "explanation": explanation
-            }
-            ALERTS.append(alert)
-            # keep only recent 100 alerts
-            if len(ALERTS) > 100:
-                ALERTS.pop(0)
+            db.insert_alert(detected_anomaly["endpoint"], detected_anomaly, explanation, timestamp_str)
                 
     return {"status": "success", "message": "Log ingested successfully"}
 
@@ -81,10 +78,25 @@ def get_anomalies():
 
 @app.get("/cluster")
 def get_clusters():
+    current_time = time.time()
+    if current_time - _CLUSTER_CACHE["timestamp"] < 5:
+        return _CLUSTER_CACHE["data"]
+        
     logs = db.get_recent_logs(limit=1000)
-    return cluster.cluster_failures(logs)
+    result = cluster.cluster_failures(logs)
+    
+    _CLUSTER_CACHE["timestamp"] = current_time
+    _CLUSTER_CACHE["data"] = result
+    return result
 
 @app.get("/alerts")
 def get_alerts():
-    # Return reversed to show newest first
-    return list(reversed(ALERTS))
+    return db.get_recent_alerts(limit=100)
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "AI-Powered API Failure Detection Backend is running!",
+        "endpoints": ["/docs", "/logs", "/anomalies", "/cluster", "/alerts"]
+    }
