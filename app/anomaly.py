@@ -1,10 +1,13 @@
-def detect_anomalies(logs):
+from typing import List, Dict, Optional
+
+def detect_anomalies(logs: List[Dict]) -> Optional[Dict]:
     if not logs:
         return None
         
-    # Calculate average latency
+    # Calculate average latency from baseline (excluding the latest log if we have history)
     latencies = [log["latency"] for log in logs]
-    avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    baseline_latencies = latencies[1:] if len(latencies) > 1 else latencies
+    avg_latency = sum(baseline_latencies) / len(baseline_latencies) if baseline_latencies else 0.0
     
     # Check latest log
     latest_log = logs[0]
@@ -23,10 +26,6 @@ def detect_anomalies(logs):
             is_anomaly = True
         if error_rate > 0.20:
             is_anomaly = True
-            
-        # Basic check for sudden drop in request volume
-        # If the latest request was long after the others relative to the period, could be a drop
-        # But for MVP, latency and error rate are primary indicators.
             
     if is_anomaly:
         return {
