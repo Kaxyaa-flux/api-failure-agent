@@ -13,7 +13,7 @@ const AlertPanel = () => {
         const data = await response.json();
         
         // Ensure newest alerts are on top
-        const sortedAlerts = data.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        const sortedAlerts = data.sort((a, b) => new Date(b.anomaly?.timestamp || 0) - new Date(a.anomaly?.timestamp || 0));
         setAlerts(sortedAlerts);
       } catch (err) {
         console.error("Error fetching alerts", err);
@@ -65,7 +65,7 @@ const AlertPanel = () => {
                   <h3>{alert.issue || 'Unknown Issue'}</h3>
                 </div>
                 <span className="alert-time">
-                  {alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString() : 'Just now'}
+                  {alert.anomaly?.timestamp ? new Date(alert.anomaly.timestamp).toLocaleTimeString() : 'Just now'}
                 </span>
               </div>
               
