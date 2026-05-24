@@ -42,6 +42,17 @@
   --shadow-float:    0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 15px var(--accent-glow);
 }
 
+.dark {
+  --bg:              #0F172A;
+  --bg-card:         #1E293B;
+  --bg-panel:        #0B1120;
+  --text:            #F8FAFC;
+  --text-muted:      #94A3B8;
+  --border:          #334155;
+  --bg-glass:        rgba(30, 41, 59, 0.85);
+  --shadow-base:     0 4px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
 html, body, #root {
   height: 100%;
   background: var(--bg);
@@ -77,6 +88,19 @@ body::after {
   z-index: 0;
 }
 
+.dark body::before {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+}
+
+.dark body::after {
+  background: 
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.1), transparent 40vw),
+    radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.1), transparent 40vw),
+    radial-gradient(circle at 50% 50%, rgba(2, 132, 199, 0.05), transparent 60vw);
+}
+
 .app {
   min-height: 100vh;
   display: flex;
@@ -91,7 +115,7 @@ body::after {
   align-items: center;
   gap: 24px;
   padding: 16px 32px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--bg-glass);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -150,6 +174,14 @@ body::after {
 .status-pill.online  { background: rgba(22, 163, 74, 0.1);  border-color: rgba(22, 163, 74, 0.3);  color: var(--healthy); }
 .status-pill.offline { background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.3); color: var(--failure); }
 .status-pill.unknown { background: rgba(100, 116, 139, 0.1); border-color: rgba(100, 116, 139, 0.3); color: var(--text-muted); }
+
+.theme-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg-panel);
+  color: var(--text-muted); cursor: pointer; transition: all 0.3s;
+}
+.theme-btn:hover { background: var(--bg-card); color: var(--text); box-shadow: var(--shadow-base); border-color: rgba(14, 165, 233, 0.3); }
 
 .seed-btn {
   display: flex; align-items: center; gap: 8px; padding: 9px 22px;
@@ -241,15 +273,15 @@ body::after {
 
 /* ── Empty State ─────────────────────────────────────────────────── */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 32px; gap: 20px; color: var(--text-dim); font-size: 15px; font-weight: 500; background: var(--bg-panel); border-radius: var(--radius); border: 1px dashed var(--border); flex: 1; transition: all 0.3s; }
-.empty:hover { border-color: rgba(14, 165, 233, 0.4); background: #F8FAFC; }
+.empty:hover { border-color: rgba(14, 165, 233, 0.4); background: var(--bg-card); }
 .empty svg { opacity: 0.6; color: var(--api-active); transition: all 0.4s; }
 
 /* ── Table (Live Logs Panel) ────────────────────────────────────── */
 .data-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; }
 .data-table th { text-align: left; padding: 14px 18px; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
-.data-table td { padding: 16px 18px; font-size: 14px; background: #fff; transition: all 0.2s; border-bottom: 1px solid var(--border); }
-.data-table tr:hover td { background: #F8FAFC; border-color: #CBD5E1; }
-.row-error td { background: #FEF2F2 !important; border-color: #FECACA !important; }
+.data-table td { padding: 16px 18px; font-size: 14px; background: var(--bg-card); transition: all 0.2s; border-bottom: 1px solid var(--border); }
+.data-table tr:hover td { background: var(--bg-panel); border-color: var(--border); }
+.row-error td { background: rgba(220, 38, 38, 0.1) !important; border-color: rgba(220, 38, 38, 0.3) !important; }
 .latency-warn { color: var(--warning); font-weight: 700; }
 .data-table td[style*="monospace"] { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--api-active) !important; font-weight: 600; }
 
