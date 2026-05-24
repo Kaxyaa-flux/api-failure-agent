@@ -1,4 +1,5 @@
-import { Shield, AlertTriangle, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { Shield, AlertTriangle, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 
 function scBadge(sc) {
   if (sc >= 500) return <span className="sc sc-5xx">{sc}</span>
@@ -18,6 +19,12 @@ function fmtTime(ts) {
  * Only clusters with status_code >= 400 are shown as active incidents.
  */
 export default function IncidentView({ clusters = [], health }) {
+  const [expanded, setExpanded] = useState({})
+
+  const toggle = (id) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
   // Filter to error clusters only, already sorted by count desc from backend
   const incidents = clusters.filter(c => c.status_code >= 400)
 
@@ -44,35 +51,52 @@ export default function IncidentView({ clusters = [], health }) {
       )}
 
       <div className="scroll-list">
-        {incidents.map((inc, i) => (
-          <div key={`${inc.endpoint}-${inc.status_code}-${i}`} className="incident-card">
-            <div className="incident-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={14} style={{ color: 'var(--red)', flexShrink: 0 }} />
-                <span className="incident-ep">{inc.endpoint}</span>
+        {incidents.map((inc, i) => {
+          const id = `${inc.endpoint}-${inc.status_code}-${i}`
+          const isExpanded = expanded[id]
+
+          return (
+            <div 
+              key={id} 
+              className={`incident-card ${isExpanded ? 'expanded' : ''}`}
+              onClick={() => toggle(id)}
+              style={{ cursor: 'pointer', flexShrink: 0 }}
+            >
+              <div className="incident-header" style={{ marginBottom: isExpanded ? 16 : 0, transition: 'margin 0.3s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={14} style={{ color: 'var(--red)', flexShrink: 0 }} />
+                  <span className="incident-ep">{inc.endpoint}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="incident-count">{inc.count} errors</span>
+                  {isExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
+                </div>
               </div>
-              <span className="incident-count">{inc.count} errors</span>
-            </div>
 
-            <div className="incident-codes">
-              {scBadge(inc.status_code)}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
-                {inc.error_class}
-              </span>
-            </div>
+              {isExpanded && (
+                <div className="incident-details" style={{ animation: 'fadeIn 0.3s' }}>
+                  <div className="incident-codes">
+                    {scBadge(inc.status_code)}
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
+                      {inc.error_class}
+                    </span>
+                  </div>
 
-            {inc.methods?.length > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                Methods: {inc.methods.join(', ')}
-              </div>
-            )}
+                  {inc.methods?.length > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                      Methods: {inc.methods.join(', ')}
+                    </div>
+                  )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-              <Clock size={11} />
-              Incident active for {Math.max(1, Math.round((new Date(inc.last_seen) - new Date(inc.first_seen)) / 60000))} min ({fmtTime(inc.first_seen)} → {fmtTime(inc.last_seen)})
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                    <Clock size={11} />
+                    Incident active for {Math.max(1, Math.round((new Date(inc.last_seen) - new Date(inc.first_seen)) / 60000))} min ({fmtTime(inc.first_seen)} → {fmtTime(inc.last_seen)})
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </>
   )

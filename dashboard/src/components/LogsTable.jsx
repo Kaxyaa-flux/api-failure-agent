@@ -1,4 +1,5 @@
-import { Database } from 'lucide-react'
+import { useState } from 'react'
+import { Database, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function methodBadge(m) {
   const cls = `method method-${m?.toUpperCase()}`
@@ -39,8 +40,12 @@ export default function LogsTable({ logs = [], anomalies = [], health }) {
     }
   }
 
-  // Show latest 100 (data already newest-first from API)
-  const visible = logs.slice(0, 100)
+  const [page, setPage] = useState(0)
+  const pageSize = 10
+  const totalPages = Math.ceil(logs.length / pageSize)
+  
+  // Show only logs for current page
+  const visible = logs.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <>
@@ -48,7 +53,7 @@ export default function LogsTable({ logs = [], anomalies = [], health }) {
         <div className="section-title">
           <Database size={16} style={{ color: 'var(--teal)' }} />
           Live Logs
-          <span className="section-badge">latest {visible.length}</span>
+          <span className="section-badge">{logs.length} Total</span>
         </div>
         {health === true && (
           <div className="poll-indicator">
@@ -101,6 +106,30 @@ export default function LogsTable({ logs = [], anomalies = [], health }) {
               })}
             </tbody>
           </table>
+          
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, logs.length)} of {logs.length}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={() => setPage(p => Math.max(0, p - 1))} 
+                  disabled={page === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)', color: page === 0 ? 'var(--text-dim)' : 'var(--text)', cursor: page === 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  <ChevronLeft size={14} /> Prev
+                </button>
+                <button 
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} 
+                  disabled={page >= totalPages - 1}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)', color: page >= totalPages - 1 ? 'var(--text-dim)' : 'var(--text)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>

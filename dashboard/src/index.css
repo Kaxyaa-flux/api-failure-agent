@@ -318,9 +318,15 @@ body::after {
 .critical-pulse { animation: critical-pulse 2s infinite; border-left: 4px solid var(--failure) !important; }
 
 /* ── Incident Cards ───────────────────────────────────────────── */
-.incident-card { background: var(--bg-card); border: 1px solid #FECACA; border-radius: var(--radius); padding: 24px; position: relative; overflow: hidden; box-shadow: var(--shadow-base); transition: all 0.4s; }
-.incident-card:hover { box-shadow: 0 10px 25px rgba(220,38,38, 0.1); transform: translateY(-4px); border-color: #F87171; }
-.incident-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; position: relative; z-index: 1; }
+.incident-card { background: var(--bg-card); border: 1px solid #FECACA; border-radius: var(--radius); padding: 20px 24px; position: relative; overflow: hidden; box-shadow: var(--shadow-base); transition: all 0.3s ease-out; flex-shrink: 0; }
+.incident-card:hover { box-shadow: 0 10px 25px rgba(220,38,38, 0.1); border-color: #F87171; }
+.incident-card.expanded { border-color: #F87171; background: var(--bg-panel); }
+.incident-header { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
 .incident-ep { font-size: 16px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; }
 .incident-count { background: #FEE2E2; color: var(--failure); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 800; border: 1px solid #FECACA; }
 .incident-codes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; position: relative; z-index: 1; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
