@@ -97,7 +97,7 @@ async def ingest_log(log: LogEntry):
 
 @app.get("/logs")
 async def get_logs():
-    return db.fetch_recent_logs(100)
+    return db.fetch_recent_logs(1000)
 
 
 @app.get("/anomalies")
@@ -130,7 +130,7 @@ async def get_alerts():
             db.insert_alert(anom["endpoint"], anom, alert)
 
     # Fetch all persisted alerts and return as flat objects
-    rows = db.fetch_recent_alerts(limit=100)
+    rows = db.fetch_recent_alerts(limit=1000)
     result = []
     for row in rows:
         flat = dict(row["explanation"])   # top-level: issue, severity, etc.
