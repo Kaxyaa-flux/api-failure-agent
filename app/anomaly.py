@@ -1,38 +1,90 @@
 from typing import List, Dict, Optional
 
-def detect_anomalies(logs: List[Dict]) -> Optional[Dict]:
+WINDOW_SIZE = 50
+LATENCY_MULTIPLIER = 2.0
+ERROR_RATE_THRESHOLD = 0.20
+
+
+def detect_anomalies(logs: List[Dict]) -> List[Dict]:
+    """
+    Analyse logs grouped by endpoint and return a list of anomaly dicts.
+    Each dict has: endpoint, anomaly_type, description, severity,
+                   value, threshold, sample_size, recent_status_codes.
+    No `timestamp` field is emitted.
+    """
     if not logs:
-        return None
-        
-    # Calculate average latency from baseline (excluding the latest log if we have history)
-    latencies = [log["latency"] for log in logs]
-    baseline_latencies = latencies[1:] if len(latencies) > 1 else latencies
-    avg_latency = sum(baseline_latencies) / len(baseline_latencies) if baseline_latencies else 0.0
-    
-    # Check latest log
-    latest_log = logs[0]
-    latest_latency = latest_log["latency"]
-    
-    # Calculate error rate (status >= 500)
-    error_count = sum(1 for log in logs if log["status_code"] >= 500)
-    error_rate = error_count / len(logs) if logs else 0.0
-    
-    # Anomaly conditions
-    is_anomaly = False
-    
-    # Require at least 5 logs to establish a baseline
-    if len(logs) >= 5:
-        if avg_latency > 0 and latest_latency > (2 * avg_latency):
-            is_anomaly = True
-        if error_rate > 0.20:
-            is_anomaly = True
-            
-    if is_anomaly:
-        return {
-            "endpoint": latest_log["endpoint"],
-            "avg_latency": round(avg_latency, 2),
-            "latest_latency": latest_latency,
-            "error_rate": round(error_rate, 2),
-            "timestamp": latest_log["timestamp"]
-        }
-    return None
+        return []
+
+    # Group by endpoint
+    by_endpoint: Dict[str, List[Dict]] = {}
+    for log in logs:
+        ep = log["endpoint"]
+        by_endpoint.setdefault(ep, []).append(log)
+
+    anomalies: List[Dict] = []
+
+    for endpoint, ep_logs in by_endpoint.items():
+        # Take at most WINDOW_SIZE newest records (already newest-first from DB)
+        window = ep_logs[:WINDOW_SIZE]
+        n = len(window)
+
+        if n < 5:
+            continue  # not enough data to establish a baseline
+
+        latencies = [l["latency"] for l in window]
+        status_codes = [l["status_code"] for l in window]
+
+        # ── Latency spike: compare newest vs average of remaining 49 ──────────
+        latest_latency = latencies[0]
+        baseline = latencies[1:] if n > 1 else latencies
+        avg_baseline = sum(baseline) / len(baseline)
+        threshold_latency = avg_baseline * LATENCY_MULTIPLIER
+
+        if avg_baseline > 0 and latest_latency > threshold_latency:
+            severity = (
+                "critical" if latest_latency > avg_baseline * 4
+                else "high" if latest_latency > avg_baseline * 3
+                else "medium"
+            )
+            anomalies.append({
+                "endpoint": endpoint,
+                "anomaly_type": "latency_spike",
+                "description": (
+                    f"Latest latency {latest_latency:.0f}ms is "
+                    f"{latest_latency / avg_baseline:.1f}x the baseline avg "
+                    f"{avg_baseline:.0f}ms"
+                ),
+                "severity": severity,
+                "value": round(latest_latency, 2),
+                "threshold": round(threshold_latency, 2),
+                "sample_size": n,
+                "recent_status_codes": status_codes[:10],
+            })
+
+        # ── High error rate: 4xx/5xx share > 20 % ────────────────────────────
+        error_count = sum(1 for sc in status_codes if sc >= 400)
+        error_rate = error_count / n
+        threshold_rate = ERROR_RATE_THRESHOLD
+
+        if error_rate > threshold_rate:
+            severity = (
+                "critical" if error_rate > 0.60
+                else "high" if error_rate > 0.40
+                else "medium"
+            )
+            anomalies.append({
+                "endpoint": endpoint,
+                "anomaly_type": "high_error_rate",
+                "description": (
+                    f"Error rate {error_rate * 100:.1f}% exceeds "
+                    f"threshold {threshold_rate * 100:.0f}% "
+                    f"({error_count}/{n} requests failed)"
+                ),
+                "severity": severity,
+                "value": round(error_rate, 4),
+                "threshold": threshold_rate,
+                "sample_size": n,
+                "recent_status_codes": status_codes[:10],
+            })
+
+    return anomalies
