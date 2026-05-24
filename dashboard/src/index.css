@@ -243,7 +243,7 @@ body::after {
 .card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 32px; position: relative; box-shadow: var(--shadow-base);
-  display: flex; flex-direction: column; transition: box-shadow 0.4s, border-color 0.4s;
+  display: flex; flex-direction: column; justify-content: flex-start; transition: box-shadow 0.4s, border-color 0.4s;
 }
 .card:hover { box-shadow: var(--shadow-float); border-color: rgba(124, 58, 237, 0.2); }
 .card.wide    { grid-column: 1; }
@@ -284,6 +284,20 @@ body::after {
 .row-error td { background: rgba(220, 38, 38, 0.1) !important; border-color: rgba(220, 38, 38, 0.3) !important; }
 .latency-warn { color: var(--warning); font-weight: 700; }
 .data-table td[style*="monospace"] { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--api-active) !important; font-weight: 600; }
+
+/* ── Scrollable Lists ─────────────────────────────────────────────────── */
+.scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 380px;
+  padding-right: 8px;
+}
+.scroll-list::-webkit-scrollbar { width: 6px; }
+.scroll-list::-webkit-scrollbar-track { background: transparent; }
+.scroll-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
 /* ── Hero Alert Classes ────────────────────────────────────────────── */
 .hero-alert { background: var(--bg-card); border-left: 4px solid var(--border); padding: 16px; margin-bottom: 12px; border-radius: 4px; font-family: 'Inter', sans-serif; box-shadow: var(--shadow-base); }
