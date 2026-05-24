@@ -9,7 +9,7 @@ function CustomTooltip({ active, payload, label }) {
   const p = payload[0]?.payload
   return (
     <div style={{
-      background: '#1a2035', border: '1px solid rgba(255,255,255,.1)',
+      background: 'var(--bg-panel)', border: '1px solid var(--border)',
       borderRadius: 8, padding: '10px 14px', fontSize: 12,
     }}>
       <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
@@ -32,7 +32,7 @@ function CustomDot({ cx, cy, payload }) {
   return (
     <g>
       <circle cx={cx} cy={cy} r={7} fill="var(--red)" opacity={0.3} />
-      <circle cx={cx} cy={cy} r={4} fill="var(--red)" stroke="#fff" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={4} fill="var(--red)" stroke="var(--bg-card)" strokeWidth={1.5} />
     </g>
   )
 }
@@ -41,7 +41,7 @@ function CustomDot({ cx, cy, payload }) {
  * LatencyChart receives pre-fetched `logs` and `anomalies` from App.jsx.
  * No internal polling — avoids duplicate /logs and /anomalies requests.
  */
-export default function LatencyChart({ logs = [], anomalies = [] }) {
+export default function LatencyChart({ logs = [], anomalies = [], health }) {
   // Build a map: endpoint → threshold value from anomaly data
   // Only mark a log point as anomalous if its latency exceeds the
   // per-endpoint threshold (latency_spike anomalies only).
@@ -83,9 +83,11 @@ export default function LatencyChart({ logs = [], anomalies = [] }) {
             <span className="section-badge">avg {avgLatency}ms</span>
           )}
         </div>
-        <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 2s
-        </div>
+        {health === true && (
+          <div className="poll-indicator">
+            <span className="poll-dot" /> Live
+          </div>
+        )}
       </div>
 
       {chartData.length === 0 && (
@@ -98,7 +100,7 @@ export default function LatencyChart({ logs = [], anomalies = [] }) {
       {chartData.length > 0 && (
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={chartData} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="label"
               tick={{ fill: '#6b7280', fontSize: 10 }}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   AlertTriangle, CheckCircle, Zap, TrendingUp, Activity,
-  RefreshCw, Database, Shield, ChevronRight, Bot, Cpu,
+  RefreshCw, Database, Shield, ChevronRight, Bot, Cpu, Sun, Moon,
 } from 'lucide-react'
 import AlertPanel from './components/AlertPanel'
 import LatencyChart from './components/LatencyChart'
@@ -16,6 +16,12 @@ export default function App() {
   const [seeding, setSeeding] = useState(false)
   const [seedMsg, setSeedMsg] = useState('')
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
+
+  useEffect(() => {
+    document.documentElement.className = theme === 'dark' ? 'dark' : ''
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   // Shared data fetched centrally to avoid per-component duplicate polling
   const [logs, setLogs] = useState([])
@@ -122,6 +128,14 @@ export default function App() {
         </nav>
 
         <div className="header-actions">
+          <button 
+            className="theme-btn" 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          
           <div className={`status-pill ${health === true ? 'online' : health === false ? 'offline' : 'unknown'}`}>
             {health === true ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
             {health === true ? 'Backend Online' : health === false ? 'Backend Offline' : 'Connecting…'}
@@ -167,26 +181,26 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <>
             <section className="card wide">
-              <LatencyChart logs={logs} anomalies={anomalies} />
+              <LatencyChart logs={logs} anomalies={anomalies} health={health} />
             </section>
             <section className="card">
-              <AlertPanel alerts={alerts} />
+              <AlertPanel alerts={alerts} health={health} />
             </section>
           </>
         )}
         {activeTab === 'alerts' && (
           <section className="card span-full">
-            <AlertPanel alerts={alerts} expanded />
+            <AlertPanel alerts={alerts} expanded health={health} />
           </section>
         )}
         {activeTab === 'incidents' && (
           <section className="card span-full">
-            <IncidentView clusters={clusters} />
+            <IncidentView clusters={clusters} health={health} />
           </section>
         )}
         {activeTab === 'logs' && (
           <section className="card span-full">
-            <LogsTable logs={logs} anomalies={anomalies} />
+            <LogsTable logs={logs} anomalies={anomalies} health={health} />
           </section>
         )}
       </main>

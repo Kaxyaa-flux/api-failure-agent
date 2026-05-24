@@ -60,7 +60,7 @@ function AlertCard({ alert }) {
   )
 }
 
-export default function AlertPanel({ alerts = [], expanded }) {
+export default function AlertPanel({ alerts = [], expanded, health }) {
   const visible = expanded ? alerts : alerts.slice(0, 8)
 
   return (
@@ -71,10 +71,11 @@ export default function AlertPanel({ alerts = [], expanded }) {
           AI Alerts
           <span className="section-badge">{alerts.length}</span>
         </div>
-        <div className="poll-indicator">
-          <span className="poll-dot" />
-          Live · 2s
-        </div>
+        {health === true && (
+          <div className="poll-indicator">
+            <span className="poll-dot" /> Live
+          </div>
+        )}
       </div>
 
       {alerts.length === 0 && (
