@@ -4,7 +4,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
 
-DB_PATH = Path(__file__).parent / "api_logs.db"
+DB_PATH = Path(__file__).parent / "logs.db"
+
 
 @contextmanager
 def get_db():
@@ -16,82 +17,108 @@ def get_db():
     finally:
         conn.close()
 
+
 def init_db():
     with get_db() as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                endpoint TEXT,
-                method TEXT,
-                status_code INTEGER,
-                latency REAL,
-                timestamp TEXT
+            CREATE TABLE IF NOT EXISTS api_logs (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                endpoint   TEXT    NOT NULL,
+                method     TEXT    NOT NULL,
+                status_code INTEGER NOT NULL,
+                latency    REAL    NOT NULL,
+                timestamp  TEXT    NOT NULL,
+                created_at TEXT    NOT NULL DEFAULT (datetime('now'))
             )
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                endpoint TEXT,
-                anomaly TEXT,
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                endpoint   TEXT,
+                anomaly    TEXT,
                 explanation TEXT,
-                timestamp TEXT
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
         conn.commit()
 
+
+# ── Log helpers ────────────────────────────────────────────────────────────────
+
 def insert_log(endpoint: str, method: str, status_code: int, latency: float, timestamp: str):
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO logs (endpoint, method, status_code, latency, timestamp) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO api_logs (endpoint, method, status_code, latency, timestamp) VALUES (?, ?, ?, ?, ?)",
             (endpoint, method, status_code, latency, timestamp)
         )
         conn.commit()
 
-def get_recent_logs(limit: int = 100):
-    with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,))
-        return [dict(row) for row in cursor.fetchall()]
 
-def get_logs_by_endpoint(endpoint: str, limit: int = 50):
+def fetch_recent_logs(limit: int = 100):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM logs WHERE endpoint = ? ORDER BY id DESC LIMIT ?", (endpoint, limit))
-        return [dict(row) for row in cursor.fetchall()]
+        cur = conn.execute(
+            "SELECT * FROM api_logs ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in cur.fetchall()]
 
-def get_all_endpoints():
+
+def fetch_logs_for_endpoint(endpoint: str, limit: int = 50):
     with get_db() as conn:
-        cursor = conn.execute("SELECT DISTINCT endpoint FROM logs")
-        return [row["endpoint"] for row in cursor.fetchall()]
+        cur = conn.execute(
+            "SELECT * FROM api_logs WHERE endpoint = ? ORDER BY id DESC LIMIT ?",
+            (endpoint, limit)
+        )
+        return [dict(row) for row in cur.fetchall()]
 
-def insert_alert(endpoint: str, anomaly: dict, explanation: dict, timestamp: str):
+
+def fetch_all_endpoints():
+    with get_db() as conn:
+        cur = conn.execute("SELECT DISTINCT endpoint FROM api_logs")
+        return [row["endpoint"] for row in cur.fetchall()]
+
+
+def fetch_all_logs():
+    with get_db() as conn:
+        cur = conn.execute("SELECT * FROM api_logs ORDER BY id DESC")
+        return [dict(row) for row in cur.fetchall()]
+
+
+# ── Alert helpers ──────────────────────────────────────────────────────────────
+
+def insert_alert(endpoint: str, anomaly: dict, explanation: dict):
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO alerts (endpoint, anomaly, explanation, timestamp) VALUES (?, ?, ?, ?)",
-            (endpoint, json.dumps(anomaly), json.dumps(explanation), timestamp)
+            "INSERT INTO alerts (endpoint, anomaly, explanation) VALUES (?, ?, ?)",
+            (endpoint, json.dumps(anomaly), json.dumps(explanation))
         )
         conn.commit()
 
-def get_recent_alerts(limit: int = 100):
+
+def fetch_recent_alerts(limit: int = 100):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,))
+        cur = conn.execute(
+            "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
+        )
         alerts = []
-        for row in cursor.fetchall():
-            alert_dict = dict(row)
-            alert_dict["anomaly"] = json.loads(alert_dict["anomaly"])
-            alert_dict["explanation"] = json.loads(alert_dict["explanation"])
-            alerts.append(alert_dict)
+        for row in cur.fetchall():
+            d = dict(row)
+            d["anomaly"] = json.loads(d["anomaly"])
+            d["explanation"] = json.loads(d["explanation"])
+            alerts.append(d)
         return alerts
 
-def has_recent_alert(endpoint: str, current_timestamp: str, within_minutes: int = 5) -> bool:
+
+def has_recent_alert(endpoint: str, within_minutes: int = 5) -> bool:
     with get_db() as conn:
-        cursor = conn.execute("SELECT timestamp FROM alerts WHERE endpoint = ? ORDER BY id DESC LIMIT 1", (endpoint,))
-        row = cursor.fetchone()
+        cur = conn.execute(
+            "SELECT created_at FROM alerts WHERE endpoint = ? ORDER BY id DESC LIMIT 1",
+            (endpoint,)
+        )
+        row = cur.fetchone()
         if not row:
             return False
-            
-        last_timestamp_str = row["timestamp"]
         try:
-            last_dt = datetime.fromisoformat(last_timestamp_str.replace("Z", "+00:00"))
-            curr_dt = datetime.fromisoformat(current_timestamp.replace("Z", "+00:00"))
-            return (curr_dt - last_dt) <= timedelta(minutes=within_minutes)
+            last_dt = datetime.fromisoformat(row["created_at"])
+            return (datetime.utcnow() - last_dt) <= timedelta(minutes=within_minutes)
         except ValueError:
-            return last_timestamp_str == current_timestamp
+            return False
