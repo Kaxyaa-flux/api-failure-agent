@@ -84,7 +84,7 @@ export default function LatencyChart({ logs = [], anomalies = [] }) {
           )}
         </div>
         <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 5s
+          <span className="poll-dot" /> Live · 2s
         </div>
       </div>
 

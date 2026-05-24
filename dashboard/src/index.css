@@ -334,3 +334,47 @@ html, body, #root {
   .stats-row { flex-wrap: wrap; }
   .header { padding: 12px 16px; }
 }
+
+/* -- Hero Alert Classes ---------------------------------------------- */
+.hero-alert {
+  background: var(--bg-card);
+  border-left: 4px solid var(--border);
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+}
+.hero-header {
+  font-size: 15px; font-weight: 800; color: #fff;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.hero-time {
+  font-size: 11px; font-weight: 500; color: var(--text-muted);
+}
+.hero-meta {
+  display: flex; gap: 10px; align-items: center; margin-bottom: 16px; font-size: 12px;
+}
+.hero-section {
+  margin-bottom: 12px;
+}
+.hero-section-title {
+  font-size: 12px; font-weight: 600; color: #e2e8f0;
+}
+.hero-divider {
+  color: var(--text-muted); opacity: 0.5; line-height: 0.5; margin-bottom: 6px; user-select: none;
+}
+.hero-text {
+  font-size: 13px; color: #d1d5db; line-height: 1.5;
+}
+
+/* -- Severity Pulse Visuals ---------------------------------------------- */
+@keyframes critical-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68, 0.4); border-left-color: var(--red); }
+  70% { box-shadow: 0 0 0 10px rgba(239,68,68, 0); border-left-color: #fca5a5; }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68, 0); border-left-color: var(--red); }
+}
+.critical-pulse {
+  animation: critical-pulse 2s infinite;
+  border-left: 4px solid var(--red) !important;
+}

@@ -18,75 +18,43 @@ function SeverityIcon({ severity }) {
 }
 
 function AlertCard({ alert }) {
-  const [open, setOpen] = useState(false)
-  const confidence = typeof alert.confidence === 'number' ? alert.confidence : 0
-  const pct = Math.round(confidence * 100)
+  const timeStr = alert.created_at ? new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
   return (
-    <div className="alert-card">
-      <div className="alert-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <SeverityIcon severity={alert.severity} />
-          <div>
-            <div className="alert-title">{alert.issue || 'Unknown issue'}</div>
-            {alert.endpoint && (
-              <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                {alert.endpoint}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="alert-badges">
-          <span className={severityClass(alert.severity)}>{alert.severity || 'low'}</span>
-          <span className={`source-badge source-${alert.source || 'mock'}`}>
-            {alert.source || 'mock'}
-          </span>
-          {alert.created_at && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>
-              {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
-          )}
-        </div>
+    <div className={`hero-alert ${alert.severity === 'critical' ? 'critical-pulse' : ''}`}>
+      <div className="hero-header">
+        🚨 INCIDENT DETECTED
+        <span className="hero-time">Anomaly detected at {timeStr}</span>
+      </div>
+      <div className="hero-meta">
+        <span className={severityClass(alert.severity)}>{alert.severity || 'low'}</span>
+        <span style={{color: 'var(--text-muted)'}}>Endpoint: {alert.endpoint || 'unknown'}</span>
       </div>
 
-      {/* Confidence bar */}
-      <div className="confidence-row" style={{ marginBottom: 8 }}>
-        <span>Confidence</span>
-        <div className="progress-wrap" style={{ flex: 1 }}>
-          <div className="progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{pct}%</span>
+      <div className="hero-section">
+        <div className="hero-section-title">Root Cause</div>
+        <div className="hero-divider">──────────</div>
+        <div className="hero-text">{alert.root_cause || alert.issue || 'Unknown root cause detected.'}</div>
       </div>
 
-      {/* Root cause */}
-      {alert.root_cause && (
-        <div className="alert-cause">
-          <strong style={{ color: 'var(--text-muted)', fontSize: 11 }}>ROOT CAUSE</strong>
-          <div style={{ marginTop: 4 }}>{alert.root_cause}</div>
+      {alert.impact && (
+        <div className="hero-section">
+          <div className="hero-section-title">Impact</div>
+          <div className="hero-divider">──────</div>
+          <div className="hero-text">{alert.impact}</div>
         </div>
       )}
 
-      {/* Steps (collapsible) */}
       {Array.isArray(alert.steps) && alert.steps.length > 0 && (
-        <>
-          <button
-            onClick={() => setOpen(o => !o)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)', fontSize: 12, padding: '2px 0',
-            }}
-          >
-            {open ? '▲' : '▼'} {open ? 'Hide' : 'Show'} remediation steps ({alert.steps.length})
-          </button>
-          {open && (
-            <ul className="alert-steps" style={{ marginTop: 8 }}>
-              {alert.steps.map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ul>
-          )}
-        </>
+        <div className="hero-section" style={{marginBottom: 0}}>
+          <div className="hero-section-title">Recommended Actions</div>
+          <div className="hero-divider">───────────────────</div>
+          <div className="hero-text">
+            {alert.steps.map((step, i) => (
+              <div key={i}>{i + 1}. {step}</div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -105,7 +73,7 @@ export default function AlertPanel({ alerts = [], expanded }) {
         </div>
         <div className="poll-indicator">
           <span className="poll-dot" />
-          Live · 5s
+          Live · 2s
         </div>
       </div>
 

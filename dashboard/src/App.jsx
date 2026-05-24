@@ -8,7 +8,7 @@ import LatencyChart from './components/LatencyChart'
 import IncidentView from './components/IncidentView'
 import LogsTable from './components/LogsTable'
 
-const POLL_MS = 5000
+const POLL_MS = 2000
 
 export default function App() {
   const [health, setHealth] = useState(null)
@@ -142,11 +142,16 @@ export default function App() {
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <div className="stats-row">
         {[
-          { label: 'Total Logs', value: stats.logs, icon: Database, color: 'blue' },
-          { label: 'Anomalies', value: stats.anomalies, icon: TrendingUp, color: 'orange' },
-          { label: 'AI Alerts', value: stats.alerts, icon: AlertTriangle, color: 'red' },
+          { label: 'Total Logs', value: stats.logs, icon: Database, color: 'blue', tab: 'logs' },
+          { label: 'Anomalies', value: stats.anomalies, icon: TrendingUp, color: 'orange', tab: 'incidents' },
+          { label: 'AI Alerts', value: stats.alerts, icon: AlertTriangle, color: 'red', tab: 'alerts' },
         ].map(s => (
-          <div key={s.label} className={`stat-card stat-${s.color}`}>
+          <div 
+            key={s.label} 
+            className={`stat-card stat-${s.color}`}
+            onClick={() => setActiveTab(s.tab)}
+            style={{ cursor: 'pointer' }}
+          >
             <div className="stat-icon"><s.icon size={20} /></div>
             <div>
               <div className="stat-value">{s.value}</div>

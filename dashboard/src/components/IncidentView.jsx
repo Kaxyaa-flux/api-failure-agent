@@ -30,7 +30,7 @@ export default function IncidentView({ clusters = [] }) {
           <span className="section-badge">{incidents.length}</span>
         </div>
         <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 5s
+          <span className="poll-dot" /> Live · 2s
         </div>
       </div>
 
@@ -67,7 +67,7 @@ export default function IncidentView({ clusters = [] }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
               <Clock size={11} />
-              {fmtTime(inc.first_seen)} → {fmtTime(inc.last_seen)}
+              Incident active for {Math.max(1, Math.round((new Date(inc.last_seen) - new Date(inc.first_seen)) / 60000))} min ({fmtTime(inc.first_seen)} → {fmtTime(inc.last_seen)})
             </div>
           </div>
         ))}
