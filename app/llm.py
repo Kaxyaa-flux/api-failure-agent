@@ -188,6 +188,7 @@ def generate_alert(anomaly: dict) -> dict:
             text = message.content[0].text.strip()
             # Log raw output before parsing so failures are visible (#12)
             print(f"[llm] Claude raw response: {text[:300]}")
+            text = _strip_markdown_fences(text)
             result = json.loads(text)
             # Ensure required fields and correct source tag
             result["source"] = "claude"

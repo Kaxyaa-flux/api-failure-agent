@@ -92,33 +92,7 @@ function AlertCard({ alert }) {
   )
 }
 
-export default function AlertPanel({ expanded }) {
-  const [alerts, setAlerts] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch('/alerts')
-      const data = await res.json()
-      // Sort newest-first by created_at; fall back to confidence if missing
-      data.sort((a, b) => {
-        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
-        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
-        if (tb !== ta) return tb - ta
-        return (b.confidence ?? 0) - (a.confidence ?? 0)
-      })
-      setAlerts(data)
-    } catch { /* ignore */ } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
-  }, [poll])
-
+export default function AlertPanel({ alerts = [], expanded }) {
   const visible = expanded ? alerts : alerts.slice(0, 8)
 
   return (

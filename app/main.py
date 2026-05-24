@@ -5,7 +5,7 @@ import random
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 import app.db as db
 import app.anomaly as anomaly_mod
@@ -67,7 +67,7 @@ class LogEntry(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", include_in_schema=False)
-def root():
+async def root():
     return RedirectResponse(url="/docs")
 
 
@@ -107,14 +107,14 @@ async def get_anomalies():
 
 
 @app.get("/clusters")
-def get_clusters():
+async def get_clusters():
     # Cap at 2000 rows — avoids full-table scan on every 5-second poll
     logs = db.fetch_recent_logs(limit=2000)
     return cluster_mod.cluster_failures(logs)
 
 
 @app.get("/alerts")
-def get_alerts():
+async def get_alerts():
     """
     1. Run live anomaly detection against recent logs.
     2. For any anomaly that has no alert within the cooldown window,
@@ -125,7 +125,7 @@ def get_alerts():
     all_logs = db.fetch_recent_logs(500)
     detected = anomaly_mod.detect_anomalies(all_logs)
     for anom in detected:
-        if not db.has_recent_alert(anom["endpoint"], within_minutes=5):
+        if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom.get("anomaly_type", ""), within_minutes=5):
             alert = llm.generate_alert(anom)
             db.insert_alert(anom["endpoint"], anom, alert)
 
