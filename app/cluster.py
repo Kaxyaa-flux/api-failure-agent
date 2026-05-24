@@ -1,4 +1,5 @@
 from typing import List, Dict
+from datetime import datetime, timezone
 
 # Map HTTP status codes to human-readable error classes
 _ERROR_CLASS_MAP = {
@@ -27,6 +28,18 @@ def _error_class(status_code: int) -> str:
     return "Unknown"
 
 
+def _parse_ts(ts_str: str) -> datetime:
+    """Parse an ISO 8601 timestamp string into a UTC-aware datetime object."""
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        # Fallback: epoch so it never disrupts min/max comparisons
+        return datetime.fromtimestamp(0, tz=timezone.utc)
+
+
 def cluster_failures(logs: List[Dict]) -> List[Dict]:
     """
     Group logs by (endpoint, status_code).
@@ -42,6 +55,8 @@ def cluster_failures(logs: List[Dict]) -> List[Dict]:
         sc = log["status_code"]
         key = (ep, sc)
 
+        log_dt = _parse_ts(log["timestamp"])
+
         if key not in buckets:
             buckets[key] = {
                 "endpoint": ep,
@@ -49,9 +64,11 @@ def cluster_failures(logs: List[Dict]) -> List[Dict]:
                 "error_class": _error_class(sc),
                 "count": 0,
                 "latency_sum": 0.0,
-                # list of (timestamp_str, latency) for finding latest
+                # list of (datetime, latency) for finding latest
                 "_ts_lat_pairs": [],
                 "methods": set(),
+                "first_seen_dt": log_dt,
+                "last_seen_dt": log_dt,
                 "first_seen": log["timestamp"],
                 "last_seen": log["timestamp"],
             }
@@ -59,13 +76,15 @@ def cluster_failures(logs: List[Dict]) -> List[Dict]:
         b = buckets[key]
         b["count"] += 1
         b["latency_sum"] += log["latency"]
-        b["_ts_lat_pairs"].append((log["timestamp"], log["latency"]))
+        b["_ts_lat_pairs"].append((log_dt, log["latency"]))
         b["methods"].add(log["method"])
 
-        # Track first/last timestamps lexicographically (ISO strings are sortable)
-        if log["timestamp"] < b["first_seen"]:
+        # Track first/last using parsed datetime objects (not string comparison)
+        if log_dt < b["first_seen_dt"]:
+            b["first_seen_dt"] = log_dt
             b["first_seen"] = log["timestamp"]
-        if log["timestamp"] > b["last_seen"]:
+        if log_dt > b["last_seen_dt"]:
+            b["last_seen_dt"] = log_dt
             b["last_seen"] = log["timestamp"]
 
     # Build final cluster objects
@@ -74,7 +93,7 @@ def cluster_failures(logs: List[Dict]) -> List[Dict]:
         count = b["count"]
         avg_latency = round(b["latency_sum"] / count, 2) if count else 0.0
 
-        # Sort (timestamp, latency) pairs and take the most recent latency
+        # Sort (datetime, latency) pairs and take the most recent latency
         sorted_pairs = sorted(b["_ts_lat_pairs"], key=lambda p: p[0])
         latest_latency = sorted_pairs[-1][1] if sorted_pairs else 0.0
 

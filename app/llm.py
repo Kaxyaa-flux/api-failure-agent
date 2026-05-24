@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import random
 
 try:
@@ -9,7 +10,22 @@ except ImportError:
     _HAS_SDK = False
 
 MODEL = "claude-sonnet-4-20250514"
-MAX_TOKENS = 512
+MAX_TOKENS = 1024  # Increased from 512 to prevent response truncation
+
+# ── Singleton Anthropic client (created once, reused per request) ──────────────
+_client: "anthropic.Anthropic | None" = None
+
+
+def _get_client() -> "anthropic.Anthropic":
+    """Return the module-level singleton Anthropic client, creating it once."""
+    global _client
+    if _client is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if not api_key:
+            raise EnvironmentError("ANTHROPIC_API_KEY is not set or is empty.")
+        _client = anthropic.Anthropic(api_key=api_key)
+    return _client
+
 
 # ── Mock templates ─────────────────────────────────────────────────────────────
 
@@ -142,6 +158,16 @@ def _build_prompt(anomaly: dict) -> str:
     )
 
 
+def _strip_markdown_fences(text: str) -> str:
+    """Remove ```json ... ``` or ``` ... ``` wrappers Claude sometimes adds."""
+    text = text.strip()
+    # Remove opening fence (```json or ```)
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    # Remove closing fence
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
 def generate_alert(anomaly: dict) -> dict:
     """
     Generate a structured alert for the given anomaly.
@@ -153,7 +179,7 @@ def generate_alert(anomaly: dict) -> dict:
 
     if api_key and _HAS_SDK:
         try:
-            client = anthropic.Anthropic(api_key=api_key)
+            client = _get_client()
             message = client.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
@@ -170,8 +196,26 @@ def generate_alert(anomaly: dict) -> dict:
             # Remove any timestamp if Claude sneaked one in
             result.pop("timestamp", None)
             return result
+
+        except EnvironmentError as exc:
+            # Missing API key — log clearly, do not mask
+            print(f"[llm] Configuration error: {exc} — using mock fallback")
+
+        except anthropic.AuthenticationError as exc:  # type: ignore[attr-defined]
+            print(f"[llm] Authentication error (invalid API key): {exc} — using mock fallback")
+
+        except anthropic.RateLimitError as exc:  # type: ignore[attr-defined]
+            print(f"[llm] Rate limit exceeded: {exc} — using mock fallback")
+
+        except anthropic.APIConnectionError as exc:  # type: ignore[attr-defined]
+            print(f"[llm] Network/connection error reaching Anthropic API: {exc} — using mock fallback")
+
+        except json.JSONDecodeError as exc:
+            print(f"[llm] Failed to parse Claude JSON response: {exc} — using mock fallback")
+
         except Exception as exc:
-            print(f"[llm] Claude call failed: {exc} — using mock fallback")
+            # Catch-all for unexpected errors — still logged, not silently masked
+            print(f"[llm] Unexpected error during Claude call: {type(exc).__name__}: {exc} — using mock fallback")
 
     # Rich mock fallback
     mock = _pick_mock(anomaly)

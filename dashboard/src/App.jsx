@@ -17,23 +17,45 @@ export default function App() {
   const [seedMsg, setSeedMsg] = useState('')
   const [activeTab, setActiveTab] = useState('dashboard')
 
-  const fetchStats = useCallback(async () => {
+  // Shared data fetched centrally to avoid per-component duplicate polling
+  const [logs, setLogs] = useState([])
+  const [anomalies, setAnomalies] = useState([])
+  const [clusters, setClusters] = useState([])
+  const [alerts, setAlerts] = useState([])
+
+  const fetchAll = useCallback(async () => {
     try {
-      const [logsRes, alertsRes, anomRes] = await Promise.all([
+      const [logsRes, alertsRes, anomRes, clustersRes] = await Promise.all([
         fetch('/logs'),
         fetch('/alerts'),
         fetch('/anomalies'),
+        fetch('/clusters'),
       ])
-      const [logs, alerts, anomalies] = await Promise.all([
-        logsRes.json(), alertsRes.json(), anomRes.json(),
+
+      // Validate responses before parsing
+      if (!logsRes.ok || !alertsRes.ok || !anomRes.ok || !clustersRes.ok) {
+        console.warn('[App] One or more fetch responses were not ok')
+        return
+      }
+
+      const [logsData, alertsData, anomData, clustersData] = await Promise.all([
+        logsRes.json(), alertsRes.json(), anomRes.json(), clustersRes.json(),
       ])
-      setStats({ logs: logs.length, alerts: alerts.length, anomalies: anomalies.length })
-    } catch { /* silent */ }
+
+      setLogs(logsData)
+      setAlerts(alertsData)
+      setAnomalies(anomData)
+      setClusters(clustersData)
+      setStats({ logs: logsData.length, alerts: alertsData.length, anomalies: anomData.length })
+    } catch (err) {
+      console.warn('[App] fetchAll error:', err)
+    }
   }, [])
 
   const fetchHealth = useCallback(async () => {
     try {
       const res = await fetch('/health')
+      if (!res.ok) { setHealth(false); return }
       const data = await res.json()
       setHealth(data.status === 'ok')
     } catch {
@@ -46,11 +68,15 @@ export default function App() {
     setSeedMsg('')
     try {
       const res = await fetch('/seed', { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setSeedMsg(`✓ Seeded ${data.logs_seeded} logs — ${data.anomalies_found} anomaly(ies) detected`)
-      fetchStats()
+      // Auto-dismiss toast after 4 seconds
+      setTimeout(() => setSeedMsg(''), 4000)
+      fetchAll()
     } catch {
       setSeedMsg('✗ Seed failed — is the backend running?')
+      setTimeout(() => setSeedMsg(''), 4000)
     } finally {
       setSeeding(false)
     }
@@ -58,10 +84,10 @@ export default function App() {
 
   useEffect(() => {
     fetchHealth()
-    fetchStats()
-    const id = setInterval(() => { fetchHealth(); fetchStats() }, POLL_MS)
+    fetchAll()
+    const id = setInterval(() => { fetchHealth(); fetchAll() }, POLL_MS)
     return () => clearInterval(id)
-  }, [fetchHealth, fetchStats])
+  }, [fetchHealth, fetchAll])
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
@@ -135,18 +161,28 @@ export default function App() {
       <main className="main-grid">
         {activeTab === 'dashboard' && (
           <>
-            <section className="card wide"><LatencyChart /></section>
-            <section className="card"><AlertPanel /></section>
+            <section className="card wide">
+              <LatencyChart logs={logs} anomalies={anomalies} />
+            </section>
+            <section className="card">
+              <AlertPanel alerts={alerts} />
+            </section>
           </>
         )}
         {activeTab === 'alerts' && (
-          <section className="card span-full"><AlertPanel expanded /></section>
+          <section className="card span-full">
+            <AlertPanel alerts={alerts} expanded />
+          </section>
         )}
         {activeTab === 'incidents' && (
-          <section className="card span-full"><IncidentView /></section>
+          <section className="card span-full">
+            <IncidentView clusters={clusters} />
+          </section>
         )}
         {activeTab === 'logs' && (
-          <section className="card span-full"><LogsTable /></section>
+          <section className="card span-full">
+            <LogsTable logs={logs} anomalies={anomalies} />
+          </section>
         )}
       </main>
     </div>

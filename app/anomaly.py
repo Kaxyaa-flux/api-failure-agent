@@ -1,8 +1,10 @@
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 WINDOW_SIZE = 50
 LATENCY_MULTIPLIER = 2.0
 ERROR_RATE_THRESHOLD = 0.20
+# Number of recent points to average for spike detection (rolling window head)
+SPIKE_HEAD = 3
 
 
 def detect_anomalies(logs: List[Dict]) -> List[Dict]:
@@ -34,34 +36,40 @@ def detect_anomalies(logs: List[Dict]) -> List[Dict]:
         latencies = [l["latency"] for l in window]
         status_codes = [l["status_code"] for l in window]
 
-        # ── Latency spike: compare newest vs average of remaining 49 ──────────
-        latest_latency = latencies[0]
-        baseline = latencies[1:] if n > 1 else latencies
-        avg_baseline = sum(baseline) / len(baseline)
+        # ── Latency spike: rolling window head vs baseline ─────────────────
+        # Use the average of the SPIKE_HEAD most-recent samples as the "current"
+        # reading, and the remaining samples as the baseline.  This avoids
+        # false positives caused by a single noisy data point.
+        head_count = min(SPIKE_HEAD, n - 2)  # must leave at least 2 for baseline
+        head_latencies = latencies[:head_count]
+        baseline_latencies = latencies[head_count:]
+
+        recent_avg = sum(head_latencies) / len(head_latencies)
+        avg_baseline = sum(baseline_latencies) / len(baseline_latencies)
         threshold_latency = avg_baseline * LATENCY_MULTIPLIER
 
-        if avg_baseline > 0 and latest_latency > threshold_latency:
+        if avg_baseline > 0 and recent_avg > threshold_latency:
             severity = (
-                "critical" if latest_latency > avg_baseline * 4
-                else "high" if latest_latency > avg_baseline * 3
+                "critical" if recent_avg > avg_baseline * 4
+                else "high" if recent_avg > avg_baseline * 3
                 else "medium"
             )
             anomalies.append({
                 "endpoint": endpoint,
                 "anomaly_type": "latency_spike",
                 "description": (
-                    f"Latest latency {latest_latency:.0f}ms is "
-                    f"{latest_latency / avg_baseline:.1f}x the baseline avg "
+                    f"Recent avg latency {recent_avg:.0f}ms (last {head_count} reqs) is "
+                    f"{recent_avg / avg_baseline:.1f}x the baseline avg "
                     f"{avg_baseline:.0f}ms"
                 ),
                 "severity": severity,
-                "value": round(latest_latency, 2),
+                "value": round(recent_avg, 2),
                 "threshold": round(threshold_latency, 2),
                 "sample_size": n,
                 "recent_status_codes": status_codes[:10],
             })
 
-        # ── High error rate: 4xx/5xx share > 20 % ────────────────────────────
+        # ── High error rate: 4xx/5xx share > 20 % ────────────────────────
         error_count = sum(1 for sc in status_codes if sc >= 400)
         error_rate = error_count / n
         threshold_rate = ERROR_RATE_THRESHOLD

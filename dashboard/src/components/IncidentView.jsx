@@ -1,7 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Shield, AlertTriangle, RefreshCw, Clock } from 'lucide-react'
-
-const POLL_MS = 5000
+import { Shield, AlertTriangle, Clock } from 'lucide-react'
 
 function scBadge(sc) {
   if (sc >= 500) return <span className="sc sc-5xx">{sc}</span>
@@ -10,66 +7,19 @@ function scBadge(sc) {
   return <span className="sc sc-2xx">{sc}</span>
 }
 
-export default function IncidentView() {
-  const [incidents, setIncidents] = useState([])
-  const [loading, setLoading] = useState(true)
+function fmtTime(ts) {
+  try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
+  catch { return ts }
+}
 
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch('/logs')
-      const logs = await res.json()
-
-      // Group errors (status >= 400) by endpoint client-side
-      const byEndpoint = {}
-      for (const log of logs) {
-        if (log.status_code < 400) continue
-        const ep = log.endpoint
-        if (!byEndpoint[ep]) {
-          byEndpoint[ep] = {
-            endpoint: ep,
-            count: 0,
-            statusCodes: new Set(),
-            timestamps: [],
-          }
-        }
-        byEndpoint[ep].count++
-        byEndpoint[ep].statusCodes.add(log.status_code)
-        byEndpoint[ep].timestamps.push(log.timestamp)
-      }
-
-      // Convert to sorted array (highest error count first)
-      const list = Object.values(byEndpoint).sort((a, b) => b.count - a.count)
-
-      // Compute time window for each incident
-      const result = list.map(inc => {
-        const sorted = [...inc.timestamps].sort()
-        const first = sorted[0]
-        const last  = sorted[sorted.length - 1]
-        return {
-          endpoint: inc.endpoint,
-          count: inc.count,
-          statusCodes: [...inc.statusCodes].sort(),
-          first_seen: first,
-          last_seen: last,
-        }
-      })
-
-      setIncidents(result)
-    } catch { /* ignore */ } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
-  }, [poll])
-
-  function fmtTime(ts) {
-    try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
-    catch { return ts }
-  }
+/**
+ * IncidentView receives pre-fetched `clusters` from App.jsx via the /clusters API.
+ * No internal polling or client-side grouping — backend cluster data is used directly.
+ * Only clusters with status_code >= 400 are shown as active incidents.
+ */
+export default function IncidentView({ clusters = [] }) {
+  // Filter to error clusters only, already sorted by count desc from backend
+  const incidents = clusters.filter(c => c.status_code >= 400)
 
   return (
     <>
@@ -80,14 +30,11 @@ export default function IncidentView() {
           <span className="section-badge">{incidents.length}</span>
         </div>
         <div className="poll-indicator">
-          {loading
-            ? <><RefreshCw size={10} className="spin" /> Loading</>
-            : <><span className="poll-dot" /> Live · 5s</>
-          }
+          <span className="poll-dot" /> Live · 5s
         </div>
       </div>
 
-      {!loading && incidents.length === 0 && (
+      {incidents.length === 0 && (
         <div className="empty">
           <Shield size={32} />
           <span>No incidents detected — all endpoints healthy</span>
@@ -95,8 +42,8 @@ export default function IncidentView() {
       )}
 
       <div className="scroll-list">
-        {incidents.map(inc => (
-          <div key={inc.endpoint} className="incident-card">
+        {incidents.map((inc, i) => (
+          <div key={`${inc.endpoint}-${inc.status_code}-${i}`} className="incident-card">
             <div className="incident-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={14} style={{ color: 'var(--red)', flexShrink: 0 }} />
@@ -106,10 +53,17 @@ export default function IncidentView() {
             </div>
 
             <div className="incident-codes">
-              {inc.statusCodes.map(sc => (
-                <span key={sc}>{scBadge(sc)}</span>
-              ))}
+              {scBadge(inc.status_code)}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
+                {inc.error_class}
+              </span>
             </div>
+
+            {inc.methods?.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                Methods: {inc.methods.join(', ')}
+              </div>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
               <Clock size={11} />
