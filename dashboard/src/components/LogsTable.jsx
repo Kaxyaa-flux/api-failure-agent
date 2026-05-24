@@ -1,112 +1,106 @@
-import React, { useState, useEffect } from 'react';
-import { Server, Clock, Activity, Hash, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react'
+import { Database, RefreshCw } from 'lucide-react'
 
-const LogsTable = () => {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const POLL_MS = 5000
+
+function methodBadge(m) {
+  const cls = `method method-${m?.toUpperCase()}` 
+  return <span className={cls}>{m}</span>
+}
+
+function statusBadge(sc) {
+  if (sc >= 500) return <span className="sc sc-5xx">{sc}</span>
+  if (sc >= 400) return <span className="sc sc-4xx">{sc}</span>
+  if (sc >= 300) return <span className="sc sc-3xx">{sc}</span>
+  return <span className="sc sc-2xx">{sc}</span>
+}
+
+function fmtTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    })
+  } catch { return ts }
+}
+
+export default function LogsTable() {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const poll = useCallback(async () => {
+    try {
+      const res = await fetch('/logs')
+      const data = await res.json()
+      // Show latest 10 (data already newest-first from API)
+      setLogs(data.slice(0, 10))
+    } catch { /* ignore */ } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/logs');
-        if (!response.ok) throw new Error('Failed to fetch logs');
-        const data = await response.json();
-        setLogs(data.slice(0, 10)); // Show latest 10 logs
-        setError(null);
-      } catch (err) {
-        setError('Unable to connect to backend.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (loading && logs.length === 0) return <div className="loading">Loading logs...</div>;
+    poll()
+    const id = setInterval(poll, POLL_MS)
+    return () => clearInterval(id)
+  }, [poll])
 
   return (
-    <div className="component-container">
-      <h2 className="panel-title"><Server size={20} className="icon-blue" /> Live API Logs</h2>
-      
-      {error && <div className="error-banner">{error}</div>}
-      
-      <div className="table-responsive">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th><div className="th-content"><Clock size={16} /> Timestamp</div></th>
-              <th><div className="th-content"><Activity size={16} /> Method</div></th>
-              <th>Endpoint</th>
-              <th><div className="th-content"><Hash size={16} /> Status</div></th>
-              <th>Latency (ms)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.length > 0 ? (
-              logs.map((log, index) => (
-                <tr key={index} className={log.status_code >= 400 ? 'error-row' : ''}>
-                  <td>{new Date(log.timestamp).toLocaleTimeString()}</td>
-                  <td>
-                    <span className={`method-badge ${log.method.toLowerCase()}`}>
-                      {log.method}
-                    </span>
-                  </td>
-                  <td className="endpoint-cell">{log.endpoint}</td>
-                  <td>
-                    <span className={`status-badge status-${log.status_code >= 500 ? '5xx' : log.status_code >= 400 ? '4xx' : '2xx'}`}>
-                      {log.status_code}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={log.latency > 1000 ? 'high-latency' : ''}>
-                      {parseFloat(log.latency).toFixed(2)}
-                    </span>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" className="empty-state">No logs available</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+    <>
+      <div className="section-header">
+        <div className="section-title">
+          <Database size={16} style={{ color: 'var(--teal)' }} />
+          Live Logs
+          <span className="section-badge">latest 10</span>
+        </div>
+        <div className="poll-indicator">
+          {loading
+            ? <><RefreshCw size={10} className="spin" /> Loading</>
+            : <><span className="poll-dot" /> Live · 5s</>
+          }
+        </div>
       </div>
-      
-      <style>{`
-        .component-container { height: 100%; display: flex; flex-direction: column; }
-        .icon-blue { color: var(--accent-color); }
-        .error-banner { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.875rem; border: 1px solid rgba(239, 68, 68, 0.2); }
-        .table-responsive { overflow-x: auto; }
-        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
-        .data-table th { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500; }
-        .th-content { display: flex; align-items: center; gap: 0.375rem; }
-        .data-table td { padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
-        .data-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
-        .error-row { background: rgba(239, 68, 68, 0.05); }
-        
-        .method-badge { padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-        .method-badge.get { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-        .method-badge.post { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-        .method-badge.put { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-        .method-badge.delete { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-        
-        .endpoint-cell { font-family: monospace; color: #d1d5db; }
-        
-        .status-badge { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-        .status-2xx { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-        .status-4xx { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-        .status-5xx { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-        
-        .high-latency { color: var(--warning-color); font-weight: 500; }
-        .empty-state { text-align: center; color: var(--text-secondary); padding: 2rem !important; }
-      `}</style>
-    </div>
-  );
-};
 
-export default LogsTable;
+      {!loading && logs.length === 0 && (
+        <div className="empty">
+          <Database size={32} />
+          <span>No logs yet — send requests or click Seed Data</span>
+        </div>
+      )}
+
+      {logs.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log, i) => {
+                const isError   = log.status_code >= 400
+                const isSlowLat = log.latency > 1000
+                return (
+                  <tr key={log.id ?? i} className={isError ? 'row-error' : ''}>
+                    <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>
+                      {fmtTime(log.timestamp)}
+                    </td>
+                    <td>{methodBadge(log.method)}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{log.endpoint}</td>
+                    <td>{statusBadge(log.status_code)}</td>
+                    <td className={isSlowLat ? 'latency-warn' : ''}>
+                      {log.latency?.toFixed(1)} ms
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
