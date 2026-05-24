@@ -4,7 +4,7 @@ import random
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 import app.db as db
 import app.anomaly as anomaly_mod
@@ -29,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_VALID_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 class LogEntry(BaseModel):
@@ -38,11 +40,33 @@ class LogEntry(BaseModel):
     latency: float
     timestamp: datetime
 
+    @field_validator("status_code")
+    @classmethod
+    def validate_status_code(cls, v: int) -> int:
+        if not (100 <= v <= 599):
+            raise ValueError(f"status_code must be between 100 and 599, got {v}")
+        return v
+
+    @field_validator("latency")
+    @classmethod
+    def validate_latency(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError(f"latency must be >= 0, got {v}")
+        return v
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, v: str) -> str:
+        upper = v.upper()
+        if upper not in _VALID_METHODS:
+            raise ValueError(f"method must be one of {_VALID_METHODS}, got {v!r}")
+        return upper
+
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.post("/logs")
-def ingest_log(log: LogEntry):
+async def ingest_log(log: LogEntry):
     ts = log.timestamp.isoformat()
     db.insert_log(
         endpoint=log.endpoint,
@@ -57,7 +81,8 @@ def ingest_log(log: LogEntry):
     detected = anomaly_mod.detect_anomalies(ep_logs)
 
     for anom in detected:
-        if not db.has_recent_alert(anom["endpoint"], within_minutes=5):
+        anom_type = anom.get("anomaly_type", "")
+        if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom_type, within_minutes=5):
             alert = llm.generate_alert(anom)
             db.insert_alert(anom["endpoint"], anom, alert)
 
@@ -65,24 +90,24 @@ def ingest_log(log: LogEntry):
 
 
 @app.get("/logs")
-def get_logs():
+async def get_logs():
     return db.fetch_recent_logs(100)
 
 
 @app.get("/anomalies")
-def get_anomalies():
+async def get_anomalies():
     all_logs = db.fetch_recent_logs(500)
     return anomaly_mod.detect_anomalies(all_logs)
 
 
 @app.get("/clusters")
-def get_clusters():
+async def get_clusters():
     logs = db.fetch_all_logs()
     return cluster_mod.cluster_failures(logs)
 
 
 @app.get("/alerts")
-def get_alerts():
+async def get_alerts():
     rows = db.fetch_recent_alerts(limit=100)
     # Flatten: return the explanation dict enriched with DB metadata
     alerts = []
@@ -95,16 +120,15 @@ def get_alerts():
 
 
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok", "service": "API Failure Detection Agent"}
 
 
 @app.post("/seed")
-def seed_data():
+async def seed_data():
     """
-    Inject anomalous synthetic traffic into /api/payment:
-      - Every 5th request returns HTTP 500
-      - Every 7th request gets a latency spike (1500–3000 ms)
+    Inject anomalous synthetic traffic into multiple endpoints.
+    Anomaly patterns are applied to every endpoint proportionally.
     """
     endpoints = [
         "/api/payment",
@@ -115,6 +139,7 @@ def seed_data():
     ]
     methods = ["GET", "POST", "PUT", "DELETE"]
     seeded = 0
+    all_detected = []
 
     for i in range(60):
         ep = random.choice(endpoints)
@@ -122,12 +147,11 @@ def seed_data():
         latency = round(random.uniform(80, 400), 2)
         status = 200
 
-        # Force anomaly pattern on /api/payment
-        if ep == "/api/payment":
-            if (i + 1) % 5 == 0:
-                status = 500
-            if (i + 1) % 7 == 0:
-                latency = round(random.uniform(1500, 3000), 2)
+        # Apply anomaly patterns uniformly across all endpoints
+        if (i + 1) % 5 == 0:
+            status = 500
+        if (i + 1) % 7 == 0:
+            latency = round(random.uniform(1500, 3000), 2)
 
         ts = datetime.now(timezone.utc).isoformat()
         db.insert_log(
@@ -139,12 +163,19 @@ def seed_data():
         )
         seeded += 1
 
-    # Trigger anomaly detection after seeding
-    ep_logs = db.fetch_logs_for_endpoint("/api/payment", limit=50)
-    detected = anomaly_mod.detect_anomalies(ep_logs)
-    for anom in detected:
-        if not db.has_recent_alert(anom["endpoint"], within_minutes=1):
-            alert = llm.generate_alert(anom)
-            db.insert_alert(anom["endpoint"], anom, alert)
+    # Trigger anomaly detection for ALL seeded endpoints
+    for ep in endpoints:
+        ep_logs = db.fetch_logs_for_endpoint(ep, limit=50)
+        detected = anomaly_mod.detect_anomalies(ep_logs)
+        for anom in detected:
+            anom_type = anom.get("anomaly_type", "")
+            if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom_type, within_minutes=1):
+                alert = llm.generate_alert(anom)
+                db.insert_alert(anom["endpoint"], anom, alert)
+        all_detected.extend(detected)
 
-    return {"status": "ok", "logs_seeded": seeded, "anomalies_found": len(detected)}
+    return {
+        "status": "ok",
+        "logs_seeded": seeded,
+        "anomalies_found": len(all_detected),
+    }

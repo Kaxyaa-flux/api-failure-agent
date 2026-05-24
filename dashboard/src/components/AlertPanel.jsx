@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Bot, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
-
-const POLL_MS = 5000
+import { useState } from 'react'
+import { Bot, AlertTriangle } from 'lucide-react'
 
 function severityClass(s) {
   if (s === 'critical') return 'sev sev-critical'
@@ -74,8 +72,7 @@ function AlertCard({ alert }) {
               color: 'var(--text-muted)', fontSize: 12, padding: '2px 0',
             }}
           >
-            {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {open ? 'Hide' : 'Show'} remediation steps ({alert.steps.length})
+            {open ? '▲' : '▼'} {open ? 'Hide' : 'Show'} remediation steps ({alert.steps.length})
           </button>
           {open && (
             <ul className="alert-steps" style={{ marginTop: 8 }}>
@@ -90,29 +87,14 @@ function AlertCard({ alert }) {
   )
 }
 
-export default function AlertPanel({ expanded }) {
-  const [alerts, setAlerts] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch('/alerts')
-      const data = await res.json()
-      // Sort by confidence descending — NO timestamp field
-      data.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
-      setAlerts(data)
-    } catch { /* ignore */ } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
-  }, [poll])
-
-  const visible = expanded ? alerts : alerts.slice(0, 8)
+/**
+ * AlertPanel receives pre-fetched `alerts` from App.jsx.
+ * No internal polling — avoids duplicate /alerts requests.
+ */
+export default function AlertPanel({ alerts = [], expanded }) {
+  // Sort by confidence descending — NO timestamp field
+  const sorted = [...alerts].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+  const visible = expanded ? sorted : sorted.slice(0, 8)
 
   return (
     <>
@@ -128,21 +110,14 @@ export default function AlertPanel({ expanded }) {
         </div>
       </div>
 
-      {loading && (
-        <div className="empty">
-          <RefreshCw size={24} className="spin" />
-          <span>Loading alerts…</span>
-        </div>
-      )}
-
-      {!loading && alerts.length === 0 && (
+      {alerts.length === 0 && (
         <div className="empty">
           <Bot size={32} />
           <span>No alerts yet — click <strong>Seed Data</strong> to generate some</span>
         </div>
       )}
 
-      {!loading && alerts.length > 0 && (
+      {alerts.length > 0 && (
         <div className="scroll-list">
           {visible.map((alert, i) => (
             <AlertCard key={alert.db_id ?? i} alert={alert} />

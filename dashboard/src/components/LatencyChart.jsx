@@ -1,11 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts'
-import { Activity, RefreshCw } from 'lucide-react'
-
-const POLL_MS = 5000
+import { Activity } from 'lucide-react'
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -40,50 +37,41 @@ function CustomDot({ cx, cy, payload }) {
   )
 }
 
-export default function LatencyChart() {
-  const [chartData, setChartData] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [avgLatency, setAvgLatency] = useState(0)
-
-  const poll = useCallback(async () => {
-    try {
-      const [logsRes, anomRes] = await Promise.all([
-        fetch('/logs'),
-        fetch('/anomalies'),
-      ])
-      const [logs, anomalies] = await Promise.all([
-        logsRes.json(), anomRes.json(),
-      ])
-
-      // Build a set of anomalous endpoint names — match by endpoint, NOT timestamp
-      const anomEndpoints = new Set(anomalies.map(a => a.endpoint))
-
-      // Take the 30 most-recent logs (they come newest-first from API → reverse for chart)
-      const slice = logs.slice(0, 30).reverse()
-
-      const points = slice.map(log => ({
-        label: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        latency: log.latency,
-        endpoint: log.endpoint,
-        status_code: log.status_code,
-        isAnomaly: anomEndpoints.has(log.endpoint),
-      }))
-
-      setChartData(points)
-      if (points.length) {
-        const avg = points.reduce((s, p) => s + p.latency, 0) / points.length
-        setAvgLatency(Math.round(avg))
-      }
-    } catch { /* ignore */ } finally {
-      setLoading(false)
+/**
+ * LatencyChart receives pre-fetched `logs` and `anomalies` from App.jsx.
+ * No internal polling — avoids duplicate /logs and /anomalies requests.
+ */
+export default function LatencyChart({ logs = [], anomalies = [] }) {
+  // Build a map: endpoint → threshold value from anomaly data
+  // Only mark a log point as anomalous if its latency exceeds the
+  // per-endpoint threshold (latency_spike anomalies only).
+  const endpointThresholds = {}
+  for (const anom of anomalies) {
+    if (anom.anomaly_type === 'latency_spike') {
+      endpointThresholds[anom.endpoint] = anom.threshold ?? 0
     }
-  }, [])
+  }
 
-  useEffect(() => {
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
-  }, [poll])
+  // Take the 30 most-recent logs (newest-first from API → reverse for chart)
+  const slice = logs.slice(0, 30).reverse()
+
+  const chartData = slice.map(log => {
+    const threshold = endpointThresholds[log.endpoint]
+    // A point is an anomaly only if this endpoint has a latency_spike AND
+    // this specific log's latency exceeds that endpoint's spike threshold.
+    const isAnomaly = threshold !== undefined && log.latency > threshold
+    return {
+      label: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      latency: log.latency,
+      endpoint: log.endpoint,
+      status_code: log.status_code,
+      isAnomaly,
+    }
+  })
+
+  const avgLatency = chartData.length
+    ? Math.round(chartData.reduce((s, p) => s + p.latency, 0) / chartData.length)
+    : 0
 
   return (
     <>
@@ -96,14 +84,11 @@ export default function LatencyChart() {
           )}
         </div>
         <div className="poll-indicator">
-          {loading
-            ? <><RefreshCw size={10} className="spin" /> Loading</>
-            : <><span className="poll-dot" /> Live · 5s</>
-          }
+          <span className="poll-dot" /> Live · 5s
         </div>
       </div>
 
-      {chartData.length === 0 && !loading && (
+      {chartData.length === 0 && (
         <div className="empty" style={{ height: 240 }}>
           <Activity size={32} />
           <span>No log data yet — click Seed Data</span>
@@ -130,7 +115,7 @@ export default function LatencyChart() {
             <Tooltip content={<CustomTooltip />} />
             <Legend
               wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 8 }}
-              formatter={v => v === 'latency' ? 'Latency (ms)' : v}
+              formatter={v => v === 'latency' ? 'Latency (ms) — all endpoints' : v}
             />
             {avgLatency > 0 && (
               <ReferenceLine

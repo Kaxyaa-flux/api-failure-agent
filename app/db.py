@@ -2,24 +2,34 @@ import sqlite3
 import json
 from contextlib import contextmanager
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 DB_PATH = Path(__file__).parent / "logs.db"
+
+# Track whether WAL mode has been set for this process (set only once)
+_wal_initialized = False
 
 
 @contextmanager
 def get_db():
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
 
 def init_db():
+    global _wal_initialized
     with get_db() as conn:
+        # Set WAL mode once per process startup
+        if not _wal_initialized:
+            conn.execute("PRAGMA journal_mode=WAL")
+            _wal_initialized = True
         conn.execute("""
             CREATE TABLE IF NOT EXISTS api_logs (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +45,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS alerts (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 endpoint   TEXT,
+                anomaly_type TEXT,
                 anomaly    TEXT,
                 explanation TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -86,10 +97,11 @@ def fetch_all_logs():
 # ── Alert helpers ──────────────────────────────────────────────────────────────
 
 def insert_alert(endpoint: str, anomaly: dict, explanation: dict):
+    anomaly_type = anomaly.get("anomaly_type", "")
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO alerts (endpoint, anomaly, explanation) VALUES (?, ?, ?)",
-            (endpoint, json.dumps(anomaly), json.dumps(explanation))
+            "INSERT INTO alerts (endpoint, anomaly_type, anomaly, explanation) VALUES (?, ?, ?, ?)",
+            (endpoint, anomaly_type, json.dumps(anomaly), json.dumps(explanation))
         )
         conn.commit()
 
@@ -108,17 +120,32 @@ def fetch_recent_alerts(limit: int = 100):
         return alerts
 
 
-def has_recent_alert(endpoint: str, within_minutes: int = 5) -> bool:
+def has_recent_alert(endpoint: str, anomaly_type: str = "", within_minutes: int = 5) -> bool:
+    """
+    Returns True if an alert for the same (endpoint, anomaly_type) pair was
+    already inserted within the last `within_minutes` minutes.
+    Different anomaly types on the same endpoint are NOT suppressed together.
+    """
     with get_db() as conn:
-        cur = conn.execute(
-            "SELECT created_at FROM alerts WHERE endpoint = ? ORDER BY id DESC LIMIT 1",
-            (endpoint,)
-        )
+        if anomaly_type:
+            cur = conn.execute(
+                "SELECT created_at FROM alerts WHERE endpoint = ? AND anomaly_type = ? ORDER BY id DESC LIMIT 1",
+                (endpoint, anomaly_type)
+            )
+        else:
+            cur = conn.execute(
+                "SELECT created_at FROM alerts WHERE endpoint = ? ORDER BY id DESC LIMIT 1",
+                (endpoint,)
+            )
         row = cur.fetchone()
         if not row:
             return False
         try:
             last_dt = datetime.fromisoformat(row["created_at"])
-            return (datetime.utcnow() - last_dt) <= timedelta(minutes=within_minutes)
+            # Normalise to UTC-aware before comparison
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            now_utc = datetime.now(timezone.utc)
+            return (now_utc - last_dt) <= timedelta(minutes=within_minutes)
         except ValueError:
             return False

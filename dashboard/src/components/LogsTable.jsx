@@ -1,10 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Database, RefreshCw } from 'lucide-react'
-
-const POLL_MS = 5000
+import { Database } from 'lucide-react'
 
 function methodBadge(m) {
-  const cls = `method method-${m?.toUpperCase()}` 
+  const cls = `method method-${m?.toUpperCase()}`
   return <span className={cls}>{m}</span>
 }
 
@@ -23,26 +20,27 @@ function fmtTime(ts) {
   } catch { return ts }
 }
 
-export default function LogsTable() {
-  const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch('/logs')
-      const data = await res.json()
-      // Show latest 10 (data already newest-first from API)
-      setLogs(data.slice(0, 10))
-    } catch { /* ignore */ } finally {
-      setLoading(false)
+/**
+ * LogsTable receives pre-fetched `logs` and `anomalies` from App.jsx.
+ * No internal polling — avoids duplicate /logs requests.
+ *
+ * Latency highlight threshold: derived from anomaly data per endpoint
+ * (latency_spike threshold), NOT a hardcoded 1000ms value.
+ */
+export default function LogsTable({ logs = [], anomalies = [] }) {
+  // Build per-endpoint latency threshold from backend anomaly data
+  const latencyThresholds = {}
+  for (const anom of anomalies) {
+    if (anom.anomaly_type === 'latency_spike' && anom.threshold != null) {
+      // Use the smaller of existing threshold if multiple anomalies exist per endpoint
+      if (!(anom.endpoint in latencyThresholds) || anom.threshold < latencyThresholds[anom.endpoint]) {
+        latencyThresholds[anom.endpoint] = anom.threshold
+      }
     }
-  }, [])
+  }
 
-  useEffect(() => {
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
-  }, [poll])
+  // Show latest 10 (data already newest-first from API)
+  const visible = logs.slice(0, 10)
 
   return (
     <>
@@ -53,21 +51,18 @@ export default function LogsTable() {
           <span className="section-badge">latest 10</span>
         </div>
         <div className="poll-indicator">
-          {loading
-            ? <><RefreshCw size={10} className="spin" /> Loading</>
-            : <><span className="poll-dot" /> Live · 5s</>
-          }
+          <span className="poll-dot" /> Live · 5s
         </div>
       </div>
 
-      {!loading && logs.length === 0 && (
+      {visible.length === 0 && (
         <div className="empty">
           <Database size={32} />
           <span>No logs yet — send requests or click Seed Data</span>
         </div>
       )}
 
-      {logs.length > 0 && (
+      {visible.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
@@ -80,9 +75,14 @@ export default function LogsTable() {
               </tr>
             </thead>
             <tbody>
-              {logs.map((log, i) => {
-                const isError   = log.status_code >= 400
-                const isSlowLat = log.latency > 1000
+              {visible.map((log, i) => {
+                const isError = log.status_code >= 400
+                // Use anomaly-derived threshold for this endpoint; fall back to
+                // 2× global average if no anomaly data exists for this endpoint
+                const threshold = latencyThresholds[log.endpoint] ?? null
+                const isSlowLat = threshold !== null
+                  ? log.latency > threshold
+                  : false
                 return (
                   <tr key={log.id ?? i} className={isError ? 'row-error' : ''}>
                     <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>
