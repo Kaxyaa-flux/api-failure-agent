@@ -41,7 +41,7 @@ function CustomDot({ cx, cy, payload }) {
  * LatencyChart receives pre-fetched `logs` and `anomalies` from App.jsx.
  * No internal polling — avoids duplicate /logs and /anomalies requests.
  */
-export default function LatencyChart({ logs = [], anomalies = [] }) {
+export default function LatencyChart({ logs = [], anomalies = [], health }) {
   // Build a map: endpoint → threshold value from anomaly data
   // Only mark a log point as anomalous if its latency exceeds the
   // per-endpoint threshold (latency_spike anomalies only).
@@ -83,9 +83,11 @@ export default function LatencyChart({ logs = [], anomalies = [] }) {
             <span className="section-badge">avg {avgLatency}ms</span>
           )}
         </div>
-        <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 2s
-        </div>
+        {health === true && (
+          <div className="poll-indicator">
+            <span className="poll-dot" /> Live
+          </div>
+        )}
       </div>
 
       {chartData.length === 0 && (

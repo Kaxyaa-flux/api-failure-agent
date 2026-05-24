@@ -17,7 +17,7 @@ function fmtTime(ts) {
  * No internal polling or client-side grouping — backend cluster data is used directly.
  * Only clusters with status_code >= 400 are shown as active incidents.
  */
-export default function IncidentView({ clusters = [] }) {
+export default function IncidentView({ clusters = [], health }) {
   // Filter to error clusters only, already sorted by count desc from backend
   const incidents = clusters.filter(c => c.status_code >= 400)
 
@@ -29,9 +29,11 @@ export default function IncidentView({ clusters = [] }) {
           Active Incidents
           <span className="section-badge">{incidents.length}</span>
         </div>
-        <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 2s
-        </div>
+        {health === true && (
+          <div className="poll-indicator">
+            <span className="poll-dot" /> Live
+          </div>
+        )}
       </div>
 
       {incidents.length === 0 && (

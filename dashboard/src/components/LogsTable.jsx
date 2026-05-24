@@ -27,7 +27,7 @@ function fmtTime(ts) {
  * Latency highlight threshold: derived from anomaly data per endpoint
  * (latency_spike threshold), NOT a hardcoded 1000ms value.
  */
-export default function LogsTable({ logs = [], anomalies = [] }) {
+export default function LogsTable({ logs = [], anomalies = [], health }) {
   // Build per-endpoint latency threshold from backend anomaly data
   const latencyThresholds = {}
   for (const anom of anomalies) {
@@ -39,8 +39,8 @@ export default function LogsTable({ logs = [], anomalies = [] }) {
     }
   }
 
-  // Show latest 10 (data already newest-first from API)
-  const visible = logs.slice(0, 10)
+  // Show latest 100 (data already newest-first from API)
+  const visible = logs.slice(0, 100)
 
   return (
     <>
@@ -48,11 +48,13 @@ export default function LogsTable({ logs = [], anomalies = [] }) {
         <div className="section-title">
           <Database size={16} style={{ color: 'var(--teal)' }} />
           Live Logs
-          <span className="section-badge">latest 10</span>
+          <span className="section-badge">latest {visible.length}</span>
         </div>
-        <div className="poll-indicator">
-          <span className="poll-dot" /> Live · 5s
-        </div>
+        {health === true && (
+          <div className="poll-indicator">
+            <span className="poll-dot" /> Live
+          </div>
+        )}
       </div>
 
       {visible.length === 0 && (
