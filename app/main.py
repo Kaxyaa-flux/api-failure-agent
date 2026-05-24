@@ -4,6 +4,7 @@ import random
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 import app.db as db
@@ -41,6 +42,11 @@ class LogEntry(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/docs")
+
+
 @app.post("/logs")
 def ingest_log(log: LogEntry):
     ts = log.timestamp.isoformat()
@@ -77,21 +83,39 @@ def get_anomalies():
 
 @app.get("/clusters")
 def get_clusters():
-    logs = db.fetch_all_logs()
+    # Cap at 2000 rows — avoids full-table scan on every 5-second poll
+    logs = db.fetch_recent_logs(limit=2000)
     return cluster_mod.cluster_failures(logs)
 
 
 @app.get("/alerts")
 def get_alerts():
+    """
+    1. Run live anomaly detection against recent logs.
+    2. For any anomaly that has no alert within the cooldown window,
+       generate one now and persist it.
+    3. Return all persisted alerts (flat dicts), sorted newest-first.
+    """
+    # Live detection pass
+    all_logs = db.fetch_recent_logs(500)
+    detected = anomaly_mod.detect_anomalies(all_logs)
+    for anom in detected:
+        if not db.has_recent_alert(anom["endpoint"], within_minutes=5):
+            alert = llm.generate_alert(anom)
+            db.insert_alert(anom["endpoint"], anom, alert)
+
+    # Fetch all persisted alerts and return as flat objects
     rows = db.fetch_recent_alerts(limit=100)
-    # Flatten: return the explanation dict enriched with DB metadata
-    alerts = []
+    result = []
     for row in rows:
-        alert = row["explanation"]
-        alert["db_id"] = row["id"]
-        alert["created_at"] = row.get("created_at", "")
-        alerts.append(alert)
-    return alerts
+        flat = dict(row["explanation"])   # top-level: issue, severity, etc.
+        flat["db_id"]     = row["id"]
+        flat["created_at"] = row.get("created_at", "")
+        flat["endpoint"]  = row.get("endpoint") or flat.get("endpoint", "")
+        # Make sure anomaly_type is surfaced
+        flat.setdefault("anomaly_type", row["anomaly"].get("anomaly_type", ""))
+        result.append(flat)
+    return result
 
 
 @app.get("/health")

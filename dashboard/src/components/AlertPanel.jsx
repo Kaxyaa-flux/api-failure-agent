@@ -43,6 +43,11 @@ function AlertCard({ alert }) {
           <span className={`source-badge source-${alert.source || 'mock'}`}>
             {alert.source || 'mock'}
           </span>
+          {alert.created_at && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>
+              {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
         </div>
       </div>
 
@@ -98,8 +103,13 @@ export default function AlertPanel({ expanded }) {
     try {
       const res = await fetch('/alerts')
       const data = await res.json()
-      // Sort by confidence descending — NO timestamp field
-      data.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      // Sort newest-first by created_at; fall back to confidence if missing
+      data.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        if (tb !== ta) return tb - ta
+        return (b.confidence ?? 0) - (a.confidence ?? 0)
+      })
       setAlerts(data)
     } catch { /* ignore */ } finally {
       setLoading(false)
