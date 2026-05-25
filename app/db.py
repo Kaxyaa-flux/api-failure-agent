@@ -54,6 +54,12 @@ def init_db():
         conn.commit()
 
 
+def reset_db():
+    with get_db() as conn:
+        conn.execute("DELETE FROM api_logs")
+        conn.execute("DELETE FROM alerts")
+        conn.commit()
+
 # ── Log helpers ────────────────────────────────────────────────────────────────
 
 def insert_log(endpoint: str, method: str, status_code: int, latency: float, timestamp: str):

@@ -24,8 +24,8 @@ app = FastAPI(title="API Failure Detection Agent", lifespan=lifespan)
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -116,19 +116,8 @@ async def get_clusters():
 @app.get("/alerts")
 async def get_alerts():
     """
-    1. Run live anomaly detection against recent logs.
-    2. For any anomaly that has no alert within the cooldown window,
-       generate one now and persist it.
-    3. Return all persisted alerts (flat dicts), sorted newest-first.
+    Return all persisted alerts (flat dicts), sorted newest-first.
     """
-    # Live detection pass
-    all_logs = db.fetch_recent_logs(500)
-    detected = anomaly_mod.detect_anomalies(all_logs)
-    for anom in detected:
-        if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom.get("anomaly_type", ""), within_minutes=5):
-            alert = llm.generate_alert(anom)
-            db.insert_alert(anom["endpoint"], anom, alert)
-
     # Fetch all persisted alerts and return as flat objects
     rows = db.fetch_recent_alerts(limit=1000)
     result = []
@@ -146,6 +135,12 @@ async def get_alerts():
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "API Failure Detection Agent"}
+
+
+@app.delete("/reset")
+async def reset_data():
+    db.reset_db()
+    return {"status": "ok", "message": "Database reset"}
 
 
 @app.post("/seed")
