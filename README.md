@@ -100,6 +100,39 @@ Start the backend server (from the root directory):
 python -m uvicorn app.main:app --reload 
 ```
 
+### ⚠️ If the backend doesn’t start
+
+If the command above fails, try the following:
+
+1. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Install Uvicorn manually**
+   ```bash
+   pip install uvicorn
+   ```
+3. **Use alternative command**
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+4. **Check Python version**
+   ```bash
+   python --version
+   ```
+   *(Requires Python 3.9+)*
+
+5. **Use a virtual environment (recommended)**
+   ```bash
+   python -m venv venv
+
+   # Activate
+   venv\Scripts\activate      # Windows
+   source venv/bin/activate   # Mac/Linux
+
+   pip install -r requirements.txt
+   ```
+
 Start the frontend dashboard:
 ```bash
 cd dashboard
