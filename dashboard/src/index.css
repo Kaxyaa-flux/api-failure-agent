@@ -330,3 +330,36 @@ body::after {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .main-grid { grid-template-columns: 1fr; padding: 24px; }
+  .card.wide { grid-column: 1 / -1; }
+  
+  .stats-row { flex-wrap: wrap; padding: 24px 24px 0; }
+  .stat-card { min-width: calc(50% - 12px); }
+}
+
+@media (max-width: 768px) {
+  .header { padding: 16px 20px; gap: 16px; flex-direction: column; align-items: stretch; }
+  .header-brand { justify-content: center; }
+  .header-actions { justify-content: center; }
+  .header-nav { justify-content: center; flex-wrap: wrap; }
+  
+  .stats-row { flex-direction: column; padding: 16px 16px 0; gap: 16px; }
+  .stat-card { min-width: 100%; padding: 20px; gap: 16px; }
+  
+  .main-grid { padding: 16px; gap: 16px; }
+  .card { padding: 20px; }
+  
+  .data-table th, .data-table td { padding: 12px 10px; font-size: 13px; }
+  .incident-card { padding: 16px; }
+  .incident-ep { font-size: 14px; }
+}
+
+@media (max-width: 480px) {
+  .header-brand { flex-direction: column; gap: 8px; text-align: center; }
+  .nav-btn { padding: 8px 12px; font-size: 13px; flex: 1; justify-content: center; }
+  .stat-value { font-size: 32px; }
+  .section-title { font-size: 15px; }
+}
