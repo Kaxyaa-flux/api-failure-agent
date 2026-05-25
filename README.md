@@ -63,7 +63,7 @@ Errors are highlighted in red and latency spikes in amber for instant visibility
 - **Frontend:** React, Vite, CSS (Custom Design System, Fully Responsive)
 - **Backend:** Python, FastAPI
 - **Database:** SQLite (Zero-configuration)
-- **AI Integration:** LLM for root cause analysis
+- **AI Integration:** Claude (Anthropic) for root cause analysis
 
 ## Installation
 
@@ -91,7 +91,7 @@ npm install
 Create a `.env` file in the root of the `app` directory for your AI provider keys (if applicable):
 ```env
 # Example environment variables
-# OPENAI_API_KEY=your_api_key_here
+# ANTHROPIC_API_KEY=your_api_key_here
 ```
 
 ### 5. Run the Application
