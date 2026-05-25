@@ -133,4 +133,4 @@ No extensive configuration is required to run the agent locally. Ensure that you
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
