@@ -93,7 +93,7 @@ The dashboard will be available at `http://localhost:5173`.
 
 ## Project Structure
 
-```
+```text
 api-failure-agent/
 ├── app/                  # Python FastAPI Backend
 │   ├── main.py           # API Routes
@@ -107,6 +107,8 @@ api-failure-agent/
 │   │   ├── App.jsx       # Main Dashboard Layout
 │   │   └── index.css     # Design System & Responsive CSS
 ├── assets/               # README Images
+├── .gitignore            # Git ignore rules
+├── LICENSE               # MIT License
 └── README.md             # Project Documentation
 ```
 
