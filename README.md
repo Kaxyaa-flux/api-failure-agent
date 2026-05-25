@@ -70,10 +70,9 @@ Create a `.env` file in the root of the `app` directory for your AI provider key
 ```
 
 ### 5. Run the Application
-Start the backend server:
+Start the backend server (from the root directory):
 ```bash
-cd app
-uvicorn main:app --reload --port 8000
+python -m uvicorn app.main:app --reload 
 ```
 
 Start the frontend dashboard:
