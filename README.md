@@ -16,21 +16,46 @@ This tool is ideal for backend engineers, DevOps teams, and SREs who want intell
 - **Day/Night Mode:** Built-in theme toggling for the dashboard.
 - **Demo Ready:** Includes a `/seed` endpoint to instantly inject synthetic traffic and anomalies for demonstrations.
 
-## Screenshots
+## How It Works
 
-### Application Flow
-![API Failure Agent Flow](assets/api_failure_agent_accurate_flow.png)
+The system ingests API logs, detects anomalies in real time, clusters related failures, and uses Claude AI to generate root cause analysis and fix recommendations.
 
-### Dashboard Overview
+![Flow Diagram](assets/api_failure_agent_accurate_flow.png)
+
+## Dashboard
+
+Real-time system health overview with a live latency monitor and AI alert feed. 
+Stat cards show total logs, anomalies detected, and AI alerts at a glance.
+
 ![Dashboard](assets/dashboard.png)
 
-### AI Alerts
-![AI Alert](assets/ai_alert.png)
+---
 
-### Active Incidents
+## AI Alerts
+
+When an anomaly is detected, Claude AI acts as an automated SRE — analyzing 
+the traffic pattern and generating a human-readable root cause and step-by-step 
+remediation plan.
+
+![AI Alerts](assets/ai_alert.png)
+
+---
+
+## Active Incidents
+
+Failures are automatically clustered by endpoint and status code. Each incident 
+shows the HTTP methods affected, error class, and how long it has been active — 
+no raw log digging required.
+
 ![Incidents](assets/incidents.png)
 
-### Live Logs
+---
+
+## Live Logs
+
+Every incoming API request is streamed to the Live Logs table in real time. 
+Errors are highlighted in red and latency spikes in amber for instant visibility.
+
 ![Live Logs](assets/live_log.png)
 
 ## Tech Stack
