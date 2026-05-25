@@ -18,7 +18,12 @@ function SeverityIcon({ severity }) {
 }
 
 function AlertCard({ alert }) {
-  const timeStr = alert.created_at ? new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+  // SQLite datetime('now') returns 'YYYY-MM-DD HH:MM:SS' in UTC without timezone info.
+  // We replace space with 'T' and append 'Z' so JS Date parses it correctly as UTC.
+  const dateStr = alert.created_at 
+    ? (alert.created_at.includes('T') ? alert.created_at : alert.created_at.replace(' ', 'T') + 'Z')
+    : null
+  const timeStr = dateStr ? new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
   return (
     <div className={`hero-alert ${alert.severity === 'critical' ? 'critical-pulse' : ''}`}>
