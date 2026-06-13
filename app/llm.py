@@ -9,7 +9,7 @@ try:
 except ImportError:
     _HAS_SDK = False
 
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 1024  # Increased from 512 to prevent response truncation
 
 # ── Singleton Anthropic client (created once, reused per request) ──────────────
