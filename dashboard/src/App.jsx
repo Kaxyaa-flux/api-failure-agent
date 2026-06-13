@@ -8,7 +8,7 @@ import LatencyChart from './components/LatencyChart'
 import IncidentView from './components/IncidentView'
 import LogsTable from './components/LogsTable'
 
-const POLL_MS = 2000
+const POLL_MS = 5000
 
 export default function App() {
   const [health, setHealth] = useState(null)
@@ -31,28 +31,21 @@ export default function App() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [logsRes, alertsRes, anomRes, clustersRes] = await Promise.all([
-        fetch('/logs'),
-        fetch('/alerts'),
-        fetch('/anomalies'),
-        fetch('/clusters'),
-      ])
+      const res = await fetch('/status')
 
-      // Validate responses before parsing
-      if (!logsRes.ok || !alertsRes.ok || !anomRes.ok || !clustersRes.ok) {
-        console.warn('[App] One or more fetch responses were not ok')
+      // Validate response before parsing
+      if (!res.ok) {
+        console.warn('[App] fetch status response was not ok')
         return
       }
 
-      const [logsData, alertsData, anomData, clustersData] = await Promise.all([
-        logsRes.json(), alertsRes.json(), anomRes.json(), clustersRes.json(),
-      ])
+      const data = await res.json()
 
-      setLogs(logsData)
-      setAlerts(alertsData)
-      setAnomalies(anomData)
-      setClusters(clustersData)
-      setStats({ logs: logsData.length, alerts: alertsData.length, anomalies: anomData.length })
+      setLogs(data.logs)
+      setAlerts(data.alerts)
+      setAnomalies(data.anomalies)
+      setClusters(data.clusters)
+      setStats({ logs: data.logs.length, alerts: data.alerts.length, anomalies: data.anomalies.length })
     } catch (err) {
       console.warn('[App] fetchAll error:', err)
     }
