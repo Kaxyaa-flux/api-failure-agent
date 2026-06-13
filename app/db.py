@@ -51,6 +51,8 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_endpoint ON api_logs(endpoint);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_endpoint_type ON alerts(endpoint, anomaly_type);")
         conn.commit()
 
 
