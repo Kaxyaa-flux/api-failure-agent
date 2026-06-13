@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import random
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,7 +84,7 @@ async def ingest_log(log: LogEntry):
     )
 
     # Run anomaly detection for this endpoint
-    ep_logs = db.fetch_logs_for_endpoint(log.endpoint, limit=50)
+    ep_logs = db.fetch_logs_for_endpoint(log.endpoint, limit=anomaly_mod.WINDOW_SIZE)
     detected = anomaly_mod.detect_anomalies(ep_logs)
 
     for anom in detected:
@@ -132,13 +133,33 @@ async def get_alerts():
     return result
 
 
+@app.get("/status")
+async def get_status():
+    logs = db.fetch_recent_logs(1000)
+    alerts_raw = db.fetch_recent_alerts(limit=1000)
+    alerts = []
+    for row in alerts_raw:
+        flat = dict(row["explanation"])
+        flat["db_id"] = row["id"]
+        flat["created_at"] = row.get("created_at", "")
+        flat["endpoint"] = row.get("endpoint") or flat.get("endpoint", "")
+        flat.setdefault("anomaly_type", row["anomaly"].get("anomaly_type", ""))
+        alerts.append(flat)
+    anomalies = anomaly_mod.detect_anomalies(logs)
+    clusters = cluster_mod.cluster_failures(logs)
+    return {"logs": logs, "alerts": alerts, "anomalies": anomalies, "clusters": clusters}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "API Failure Detection Agent"}
 
 
 @app.delete("/reset")
-async def reset_data():
+async def reset_data(secret: str = ""):
+    expected = os.environ.get("RESET_SECRET", "")
+    if expected and secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid secret")
     db.reset_db()
     return {"status": "ok", "message": "Database reset"}
 
@@ -184,7 +205,7 @@ async def seed_data():
 
     # Trigger anomaly detection for ALL seeded endpoints
     for ep in endpoints:
-        ep_logs = db.fetch_logs_for_endpoint(ep, limit=50)
+        ep_logs = db.fetch_logs_for_endpoint(ep, limit=anomaly_mod.WINDOW_SIZE)
         detected = anomaly_mod.detect_anomalies(ep_logs)
         for anom in detected:
             anom_type = anom.get("anomaly_type", "")
