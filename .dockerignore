@@ -1,0 +1,14 @@
+pycache/
+*.pyc
+*.pyo
+.venv/
+venv/
+dashboard/node_modules/
+dashboard/.vite/
+.db
+.env
+.env.
+assets/
+README.md
+SECURITY.md
+LICENSE
