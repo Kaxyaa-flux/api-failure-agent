@@ -6,12 +6,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/logs': 'http://localhost:8000',
+      '/logs':      'http://localhost:8000',
       '/anomalies': 'http://localhost:8000',
-      '/clusters': 'http://localhost:8000',
-      '/alerts': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/seed': 'http://localhost:8000',
+      '/clusters':  'http://localhost:8000',
+      '/alerts':    'http://localhost:8000',
+      '/status':    'http://localhost:8000',
+      '/health':    'http://localhost:8000',
+      '/seed':      'http://localhost:8000',
+      '/reset':     'http://localhost:8000',
     },
   },
 })
