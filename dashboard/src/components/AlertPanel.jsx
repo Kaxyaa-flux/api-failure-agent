@@ -86,7 +86,7 @@ export default function AlertPanel({ alerts = [], expanded, health }) {
       {alerts.length === 0 && (
         <div className="empty">
           <Bot size={32} />
-          <span>No alerts yet — click <strong>Seed Data</strong> to generate some</span>
+          <span>No alerts yet — anomalies will appear here as real traffic comes in</span>
         </div>
       )}
 

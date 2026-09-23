@@ -183,29 +183,6 @@ body::after {
 }
 .theme-btn:hover { background: var(--bg-card); color: var(--text); box-shadow: var(--shadow-base); border-color: rgba(14, 165, 233, 0.3); }
 
-.seed-btn {
-  display: flex; align-items: center; gap: 8px; padding: 9px 22px;
-  border: 1px solid transparent; border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
-  color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; cursor: pointer;
-  transition: all 0.4s; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);
-}
-.seed-btn:hover:not(:disabled) { 
-  transform: translateY(-2px); box-shadow: 0 6px 15px rgba(14, 165, 233, 0.3); 
-}
-.seed-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); box-shadow: none; }
-
-/* ── Seed Toast ─────────────────────────────────────────────────────────── */
-.seed-toast {
-  padding: 14px 36px; font-size: 14px; font-weight: 600; animation: slideIn 0.5s;
-  backdrop-filter: blur(16px); border-radius: var(--radius-sm); margin: 24px auto 0;
-  width: max-content; box-shadow: var(--shadow-float); position: relative; z-index: 90;
-}
-.seed-toast.success { background: #DCFCE7; color: var(--healthy); border: 1px solid #BBF7D0; }
-.seed-toast.error   { background: #FEE2E2; color: var(--failure); border: 1px solid #FECACA; }
-
-@keyframes slideIn { from { opacity: 0; transform: translateY(-30px) scale(0.9); filter: blur(5px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
-
 /* ── Stat Row ───────────────────────────────────────────────────────────── */
 .stats-row { display: flex; gap: 24px; padding: 32px 32px 0; position: relative; z-index: 2; }
 

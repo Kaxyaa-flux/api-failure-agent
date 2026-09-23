@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  AlertTriangle, CheckCircle, Zap, TrendingUp, Activity,
-  RefreshCw, Database, Shield, ChevronRight, Bot, Cpu, Sun, Moon,
+  AlertTriangle, CheckCircle, TrendingUp, Activity,
+  Database, Shield, ChevronRight, Bot, Cpu, Sun, Moon,
 } from 'lucide-react'
 import AlertPanel from './components/AlertPanel'
 import LatencyChart from './components/LatencyChart'
@@ -13,8 +13,6 @@ const POLL_MS = 5000
 export default function App() {
   const [health, setHealth] = useState(null)
   const [stats, setStats] = useState({ logs: 0, alerts: 0, anomalies: 0 })
-  const [seeding, setSeeding] = useState(false)
-  const [seedMsg, setSeedMsg] = useState('')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
 
@@ -61,25 +59,6 @@ export default function App() {
       setHealth(false)
     }
   }, [])
-
-  const handleSeed = async () => {
-    setSeeding(true)
-    setSeedMsg('')
-    try {
-      const res = await fetch('/seed', { method: 'POST' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      setSeedMsg(`✓ Seeded ${data.logs_seeded} logs — ${data.anomalies_found} anomaly(ies) detected`)
-      // Auto-dismiss toast after 4 seconds
-      setTimeout(() => setSeedMsg(''), 4000)
-      fetchAll()
-    } catch {
-      setSeedMsg('✗ Seed failed — is the backend running?')
-      setTimeout(() => setSeedMsg(''), 4000)
-    } finally {
-      setSeeding(false)
-    }
-  }
 
   useEffect(() => {
     fetchHealth()
@@ -133,18 +112,8 @@ export default function App() {
             {health === true ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
             {health === true ? 'Backend Online' : health === false ? 'Backend Offline' : 'Connecting…'}
           </div>
-          <button className="seed-btn" onClick={handleSeed} disabled={seeding}>
-            {seeding ? <RefreshCw size={14} className="spin" /> : <Zap size={14} />}
-            {seeding ? 'Seeding…' : 'Seed Data'}
-          </button>
         </div>
       </header>
-
-      {seedMsg && (
-        <div className={`seed-toast ${seedMsg.startsWith('✓') ? 'success' : 'error'}`}>
-          {seedMsg}
-        </div>
-      )}
 
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <div className="stats-row">

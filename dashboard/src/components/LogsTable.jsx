@@ -65,7 +65,7 @@ export default function LogsTable({ logs = [], anomalies = [], health }) {
       {visible.length === 0 && (
         <div className="empty">
           <Database size={32} />
-          <span>No logs yet — send requests or click Seed Data</span>
+          <span>No logs yet — send some requests to your app</span>
         </div>
       )}
 

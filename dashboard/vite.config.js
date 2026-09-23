@@ -12,7 +12,6 @@ export default defineConfig({
       '/alerts':    'http://localhost:8000',
       '/status':    'http://localhost:8000',
       '/health':    'http://localhost:8000',
-      '/seed':      'http://localhost:8000',
       '/reset':     'http://localhost:8000',
     },
   },

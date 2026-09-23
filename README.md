@@ -18,7 +18,7 @@ This tool is ideal for backend engineers, DevOps teams, and SREs who want intell
 
 ## How It Works
 
-The system ingests API logs, detects anomalies in real time, clusters related failures, and uses Claude AI to generate root cause analysis and fix recommendations.
+The system ingests API logs, detects anomalies in real time, clusters related failures, and uses Groq (Llama 3.3) to generate root cause analysis and fix recommendations.
 
 ![Flow Diagram](assets/api_failure_agent_accurate_flow.png)
 
@@ -33,7 +33,7 @@ Stat cards show total logs, anomalies detected, and AI alerts at a glance.
 
 ## AI Alerts
 
-When an anomaly is detected, Claude AI acts as an automated SRE — analyzing 
+When an anomaly is detected, Groq-hosted Llama 3.3 acts as an automated SRE — analyzing 
 the traffic pattern and generating a human-readable root cause and step-by-step 
 remediation plan.
 
@@ -63,7 +63,7 @@ Errors are highlighted in red and latency spikes in amber for instant visibility
 - **Frontend:** React, Vite, CSS (Custom Design System, Fully Responsive)
 - **Backend:** Python, FastAPI
 - **Database:** SQLite (Zero-configuration)
-- **AI Integration:** Claude (Anthropic) for root cause analysis
+- **AI Integration:** Groq (Llama 3.3) for root cause analysis
 
 ## Installation
 

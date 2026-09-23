@@ -4,26 +4,56 @@ import re
 import random
 
 try:
-    import anthropic  # type: ignore
+    import groq  # type: ignore
     _HAS_SDK = True
 except ImportError:
     _HAS_SDK = False
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "openai/gpt-oss-120b"
 MAX_TOKENS = 1024  # Increased from 512 to prevent response truncation
 
-# ── Singleton Anthropic client (created once, reused per request) ──────────────
-_client: "anthropic.Anthropic | None" = None
+# ── Deployment context ──────────────────────────────────────────────────────
+# Injected into every prompt so the model reasons from your ACTUAL
+# infrastructure instead of guessing generic SRE causes (e.g. "CPU limits",
+# "DB query plan regression") that may not apply to your stack at all.
+# Edit this to match your real deployment.
+DEPLOYMENT_CONTEXT = os.environ.get(
+    "DEPLOYMENT_CONTEXT",
+    "Hosted on Vercel serverless functions with a 10-second execution "
+    "timeout per request — a request that takes longer than 10s is killed "
+    "by the platform and returns 503. This is a TIMEOUT, not a CPU or "
+    "memory limit. Database is Supabase Postgres, accessed via the pg8000 "
+    "driver through the IPv4 connection pooler (port 6543) — if this URL "
+    "is misconfigured (e.g. pointing at the old IPv6/5432 endpoint), "
+    "connections hang until the platform times out the whole request. "
+    "LLM calls go to Groq's API. Air quality data comes from OpenWeatherMap.",
+)
+
+# Per-endpoint description of what each route actually does, so the model
+# doesn't assume generic backend behavior (e.g. a DB call) that isn't there.
+# Extend this dict as you add routes.
+ENDPOINT_CONTEXT = {
+    "/api/aqi": "Calls OpenWeatherMap's geocoding + air-pollution APIs only. No database access, no LLM call.",
+    "/api/chat": "Calls OpenWeatherMap for AQI data, then calls the Groq LLM API, then writes one row to the ChatHistory table (Postgres via Supabase pooler) if a username was given. A hang in any of these three steps — OpenWeatherMap, Groq, or the DB pooler — can cause the 10s serverless timeout.",
+    "/api/auth/register": "Writes one row to the User table (Postgres via Supabase pooler). No external API calls.",
+    "/api/auth/login": "Reads one row from the User table (Postgres via Supabase pooler). No external API calls.",
+    "/api/auth/salt": "Reads one row from the User table (Postgres via Supabase pooler). No external API calls.",
+    "/api/history": "Reads or writes ChatHistory rows (Postgres via Supabase pooler). No external API calls.",
+    "/api/validate-keys": "Calls OpenWeatherMap and Groq once each to test provided keys. No database access.",
+}
+
+# ── Singleton Groq client (created once, reused per request) ──────────────
+_client: "groq.Groq | None" = None
 
 
-def _get_client() -> "anthropic.Anthropic":
-    """Return the module-level singleton Anthropic client, creating it once."""
+def _get_client() -> "groq.Groq":
+    """Return the module-level singleton Groq client, creating it once."""
     global _client
     if _client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        api_key = os.environ.get("GROQ_API_KEY", "").strip()
         if not api_key:
-            raise EnvironmentError("ANTHROPIC_API_KEY is not set or is empty.")
-        _client = anthropic.Anthropic(api_key=api_key)
+            raise EnvironmentError("GROQ_API_KEY is not set or is empty.")
+        _client = groq.Groq(api_key=api_key)
     return _client
 
 
@@ -148,12 +178,33 @@ def _pick_mock(anomaly: dict) -> dict:
 # ── Claude integration ─────────────────────────────────────────────────────────
 
 def _build_prompt(anomaly: dict) -> str:
+    endpoint = anomaly.get("endpoint", "")
+    endpoint_note = ENDPOINT_CONTEXT.get(endpoint)
+
+    context = f"Deployment context: {DEPLOYMENT_CONTEXT}"
+    if endpoint_note:
+        context += f"\n\nWhat this specific endpoint does: {endpoint_note}"
+    else:
+        context += (
+            "\n\nNo specific description is available for this endpoint's "
+            "internals — do not guess what subsystems (database, cache, "
+            "external APIs) it touches."
+        )
+
     return (
         "You are an expert SRE analysing an API anomaly. "
+        "Ground root_cause and steps ONLY in the deployment context and "
+        "endpoint description below. Do NOT invent a specific cause (database "
+        "query plans, CPU/memory limits, cache issues, etc.) unless the context "
+        "explicitly supports it — if the endpoint description says there's no "
+        "database call, do not suggest database fixes. If the real cause isn't "
+        "determinable from what's given, say so generically and lower the "
+        "confidence score rather than naming an unsupported specific cause.\n\n"
+        f"{context}\n\n"
         "Return ONLY a valid JSON object (no markdown fences) with these exact keys:\n"
         "  endpoint (string), anomaly_type (string), issue (string), "
         "severity (string: low/medium/high/critical), confidence (float 0-1), "
-        "root_cause (string), steps (array of strings), source (must be \"claude\").\n\n"
+        "root_cause (string), steps (array of strings), source (must be \"groq\").\n\n"
         f"Anomaly data:\n{json.dumps(anomaly, indent=2)}"
     )
 
@@ -175,26 +226,26 @@ def generate_alert(anomaly: dict) -> dict:
                          confidence, root_cause, steps, source.
     No `timestamp` field is included.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
 
     if api_key and _HAS_SDK:
         try:
             client = _get_client()
-            message = client.messages.create(
+            completion = client.chat.completions.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 messages=[{"role": "user", "content": _build_prompt(anomaly)}],
             )
-            text = message.content[0].text.strip()
+            text = completion.choices[0].message.content.strip()
             # Log raw output before parsing so failures are visible (#12)
-            print(f"[llm] Claude raw response: {text[:300]}")
+            print(f"[llm] Groq raw response: {text[:300]}")
             text = _strip_markdown_fences(text)
             result = json.loads(text)
             # Ensure required fields and correct source tag
-            result["source"] = "claude"
+            result["source"] = "groq"
             result.setdefault("endpoint", anomaly.get("endpoint", ""))
             result.setdefault("anomaly_type", anomaly.get("anomaly_type", ""))
-            # Remove any timestamp if Claude sneaked one in
+            # Remove any timestamp if Groq sneaked one in
             result.pop("timestamp", None)
             return result
 
@@ -202,21 +253,21 @@ def generate_alert(anomaly: dict) -> dict:
             # Missing API key — log clearly, do not mask
             print(f"[llm] Configuration error: {exc} — using mock fallback")
 
-        except anthropic.AuthenticationError as exc:  # type: ignore[attr-defined]
+        except groq.AuthenticationError as exc:  # type: ignore[attr-defined]
             print(f"[llm] Authentication error (invalid API key): {exc} — using mock fallback")
 
-        except anthropic.RateLimitError as exc:  # type: ignore[attr-defined]
+        except groq.RateLimitError as exc:  # type: ignore[attr-defined]
             print(f"[llm] Rate limit exceeded: {exc} — using mock fallback")
 
-        except anthropic.APIConnectionError as exc:  # type: ignore[attr-defined]
-            print(f"[llm] Network/connection error reaching Anthropic API: {exc} — using mock fallback")
+        except groq.APIConnectionError as exc:  # type: ignore[attr-defined]
+            print(f"[llm] Network/connection error reaching Groq API: {exc} — using mock fallback")
 
         except json.JSONDecodeError as exc:
-            print(f"[llm] Failed to parse Claude JSON response: {exc} — using mock fallback")
+            print(f"[llm] Failed to parse Groq JSON response: {exc} — using mock fallback")
 
         except Exception as exc:
             # Catch-all for unexpected errors — still logged, not silently masked
-            print(f"[llm] Unexpected error during Claude call: {type(exc).__name__}: {exc} — using mock fallback")
+            print(f"[llm] Unexpected error during Groq call: {type(exc).__name__}: {exc} — using mock fallback")
 
     # Rich mock fallback
     mock = _pick_mock(anomaly)

@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-import random
 import os
 from pathlib import Path
 
@@ -81,9 +80,8 @@ async def ingest_log(request: Request, log: LogEntry):
     ep_logs = db.fetch_logs_for_endpoint(log.endpoint, limit=anomaly_mod.WINDOW_SIZE)
     detected = anomaly_mod.detect_anomalies(ep_logs)
     for anom in detected:
-        anom_type = anom.get("anomaly_type", "")
         if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom_type, within_minutes=5):
-            alert = llm.generate_alert(anom)
+            alert = llm.generate_alert(anom)   # <-- only fires here
             db.insert_alert(anom["endpoint"], anom, alert)
     return {"status": "ok", "anomalies_detected": len(detected)}
 
@@ -150,34 +148,6 @@ async def reset_data(request: Request, secret: str = ""):
         raise HTTPException(status_code=403, detail="Invalid secret")
     db.reset_db()
     return {"status": "ok", "message": "Database reset"}
-
-
-@app.post("/seed")
-@limiter.limit("10/minute")
-async def seed_data(request: Request):
-    endpoints = ["/api/payment", "/api/users", "/api/orders", "/api/inventory", "/api/auth"]
-    methods = ["GET", "POST", "PUT", "DELETE"]
-    seeded = 0
-    all_detected = []
-    for i in range(60):
-        ep = random.choice(endpoints)
-        method = random.choice(methods)
-        latency = round(random.uniform(80, 400), 2)
-        status = 200
-        if (i + 1) % 5 == 0:
-            status = 500
-        if (i + 1) % 7 == 0:
-            latency = round(random.uniform(1500, 3000), 2)
-        db.insert_log(endpoint=ep, method=method, status_code=status, latency=latency, timestamp=datetime.now(timezone.utc).isoformat())
-        seeded += 1
-    for ep in endpoints:
-        ep_logs = db.fetch_logs_for_endpoint(ep, limit=anomaly_mod.WINDOW_SIZE)
-        detected = anomaly_mod.detect_anomalies(ep_logs)
-        for anom in detected:
-            if not db.has_recent_alert(anom["endpoint"], anomaly_type=anom.get("anomaly_type", ""), within_minutes=1):
-                db.insert_alert(anom["endpoint"], anom, llm.generate_alert(anom))
-        all_detected.extend(detected)
-    return {"status": "ok", "logs_seeded": seeded, "anomalies_found": len(all_detected)}
 
 
 # Serve React frontend — must be LAST

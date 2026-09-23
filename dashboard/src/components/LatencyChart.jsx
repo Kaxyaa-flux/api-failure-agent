@@ -93,7 +93,7 @@ export default function LatencyChart({ logs = [], anomalies = [], health }) {
       {chartData.length === 0 && (
         <div className="empty" style={{ height: 240 }}>
           <Activity size={32} />
-          <span>No log data yet — click Seed Data</span>
+          <span>No log data yet — waiting for real traffic</span>
         </div>
       )}
 
